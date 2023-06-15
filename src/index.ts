@@ -11,14 +11,14 @@ export const Config: Schema<Config> = Schema.object({})
 async function query(ctx: Context, id?: number, name?: string, filters: object = {}) {
   if (!id && !name) return
   else if (!id) {
-    const cursor = ctx.mahjong.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
+    const cursor = ctx.mahjong.db.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
     const doc = await cursor.next()
     if (doc) {
       for (const u of doc.u) if (u.n == name) id = u.i
     } else return
   }
 
-  const cursor = ctx.mahjong.db('tziakcha').collection('matches').find({'u.i': id, ...filters}).sort('st', 'descending')
+  const cursor = ctx.mahjong.db.db('tziakcha').collection('matches').find({'u.i': id, ...filters}).sort('st', 'descending')
 
   let stats = {
     cnt: 0,
@@ -118,6 +118,6 @@ export function apply(ctx: Context) {
         }
         extra = '\n*仅计入8(8)'
       }
-      query(ctx, null, username, filters).then(s => session.send(s + extra), e => session.send(`查询失败${e}`))
+      query(ctx, null, username, filters).then(s => session.send(s ? s + extra : '查询失败'), e => session.send(`查询失败${e}`))
     })
 }
