@@ -100,7 +100,7 @@ export function apply(ctx: Context) {
     .option('all', '-a')
     .option('common', '-c')
     .action(async ({ session, options }, username) => {
-      if (!username) return null
+      if (!username) return
       let filters: object = {
         'g.n': 16,
         'g.l': 8,
