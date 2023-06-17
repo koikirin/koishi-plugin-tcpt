@@ -94,13 +94,51 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
   return msg
 }
 
+async function queryNames(ctx: Context, id?: number, name?: string) {
+  if (!id && !name) return
+  else if (!id) {
+    const cursor = ctx.mahjong.db.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
+    const doc = await cursor.next()
+    if (doc) {
+      for (const u of doc.u) if (u.n == name) id = u.i
+    } else return
+  }
+
+  const cursor = ctx.mahjong.db.db('tziakcha').collection('matches').aggregate([
+    { "$match": { "u.i": id } },
+    { "$project": {
+      "list": {
+        "$filter": {
+          "input": "$u",
+          "as": "item",
+          "cond": {
+            "$eq": [ "$$item.i", id ]
+          }
+        }
+      }
+    }},
+    { "$unwind": "$list" },
+    { "$group": {
+        "_id": "$list.n",
+        "count": {
+            "$count": {}
+        }
+    }}
+  ])
+
+  let names: { [key: string]: number } = {}
+  for await (const doc of cursor) {
+    names[doc._id] = doc.count
+  }
+  return names
+}
 
 export function apply(ctx: Context) {
-  ctx.command('tcpt <username>')
+  ctx.command('tcpt <username:string>', '查询雀渣PT')
     .option('all', '-a')
     .option('common', '-c')
     .action(async ({ session, options }, username) => {
-      if (!username) return
+      if (!username) return session.execute('tcpt -h')
       let filters: object = {
         'g.n': 16,
         'g.l': 8,
@@ -119,5 +157,13 @@ export function apply(ctx: Context) {
         extra = '\n*仅计入8(8)'
       }
       query(ctx, null, username, filters).then(s => session.send(s ? s + extra : '查询失败'), e => session.send(`查询失败${e}`))
+    })
+
+  ctx.command('tcpt/tcnames <username:string>', '查询雀渣曾用名')
+    .action(async ({ session }, username) => {
+      if (!username) return session.execute('tcnames -h')
+      const names = await queryNames(ctx, null, username)
+      if (names && Object.values(names).length) return Object.entries(names).sort(([_1, x], [_2, y]) => y - x).map(([k, v], _) => `[${v}] ${k}`).join('\n')
+      return '查询失败'
     })
 }
