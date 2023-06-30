@@ -11,14 +11,14 @@ export const Config: Schema<Config> = Schema.object({})
 async function query(ctx: Context, id?: number, name?: string, filters: object = {}) {
   if (!id && !name) return
   else if (!id) {
-    const cursor = ctx.mahjong.db.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
+    const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
     const doc = await cursor.next()
     if (doc) {
       for (const u of doc.u) if (u.n == name) id = u.i
     } else return
   }
 
-  const cursor = ctx.mahjong.db.db('tziakcha').collection('matches').find({'u.i': id, ...filters}).sort('st', 'descending')
+  const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({'u.i': id, ...filters}).sort('st', 'descending')
 
   let stats = {
     cnt: 0,
@@ -97,14 +97,14 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
 async function queryNames(ctx: Context, id?: number, name?: string) {
   if (!id && !name) return
   else if (!id) {
-    const cursor = ctx.mahjong.db.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
+    const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
     const doc = await cursor.next()
     if (doc) {
       for (const u of doc.u) if (u.n == name) id = u.i
     } else return
   }
 
-  const cursor = ctx.mahjong.db.db('tziakcha').collection('matches').aggregate([
+  const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').aggregate([
     { "$match": { "u.i": id } },
     { "$project": {
       "list": {
