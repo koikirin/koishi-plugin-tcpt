@@ -90,7 +90,7 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
   let msg = `${name} 合计${stats.cnt}战 [${stats.r1}/${stats.r2}/${stats.r3}/${stats.r4}]
 和率${p(stats.hule/stats.cntr)} 铳率${p(stats.chong/stats.cntr)} 平分${p(scores/stats.cntr, 'decimal')}
 自摸率${p(stats.tsumo/stats.hule)} 被摸率${p(stats.btsumo/stats.cntr)} 错和分${p(stats.cuohu/stats.cntr)}
-最近战绩 [${stats.trend.slice(-10).split('').reverse().join('')}]`
+最近战绩 [${stats.trend.slice(0, 10).split('').reverse().join('')}]`
   return msg
 }
 
