@@ -4,21 +4,21 @@ import { fillDocumentRounds } from './utils'
 export const name = 'tcpt'
 export const using = ['mahjong']
 
-export interface Config {}
+export interface Config { }
 
 export const Config: Schema<Config> = Schema.object({})
 
 async function query(ctx: Context, id?: number, name?: string, filters: object = {}) {
   if (!id && !name) return
   else if (!id) {
-    const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
+    const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.n': name }).sort('st', 'descending').limit(1)
     const doc = await cursor.next()
     if (doc) {
       for (const u of doc.u) if (u.n == name) id = u.i
     } else return
   }
 
-  const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({'u.i': id, ...filters}).sort('st', 'descending')
+  const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.i': id, ...filters }).sort('st', 'descending')
 
   let stats = {
     cnt: 0,
@@ -77,7 +77,7 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
 
   if (stats.hule == 0)
     return '错误：账号胡率为0'
-  
+
   function p(num: number, style = 'percent'): string {
     return new Intl.NumberFormat('default', {
       style: style,
@@ -88,8 +88,8 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
 
   const scores = stats.r1s + stats.r2s + stats.r3s + stats.r4s - stats.rps
   let msg = `${name} 合计${stats.cnt}战 [${stats.r1}/${stats.r2}/${stats.r3}/${stats.r4}]
-和率${p(stats.hule/stats.cntr)} 铳率${p(stats.chong/stats.cntr)} 平分${p(scores/stats.cntr, 'decimal')}
-自摸率${p(stats.tsumo/stats.hule)} 被摸率${p(stats.btsumo/stats.cntr)} 错和分${p(stats.cuohu/stats.cntr)}
+和率${p(stats.hule / stats.cntr)} 铳率${p(stats.chong / stats.cntr)} 平分${p(scores / stats.cntr, 'decimal')}
+自摸率${p(stats.tsumo / stats.hule)} 被摸率${p(stats.btsumo / stats.cntr)} 错和率${p(stats.cuohu / stats.cntr)}
 最近战绩 [${stats.trend.slice(0, 10).split('').reverse().join('')}]`
   return msg
 }
@@ -97,7 +97,7 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
 async function queryNames(ctx: Context, id?: number, name?: string) {
   if (!id && !name) return
   else if (!id) {
-    const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({'u.n': name}).sort('st', 'descending').limit(1)
+    const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.n': name }).sort('st', 'descending').limit(1)
     const doc = await cursor.next()
     if (doc) {
       for (const u of doc.u) if (u.n == name) id = u.i
@@ -106,24 +106,28 @@ async function queryNames(ctx: Context, id?: number, name?: string) {
 
   const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').aggregate([
     { "$match": { "u.i": id } },
-    { "$project": {
-      "list": {
-        "$filter": {
-          "input": "$u",
-          "as": "item",
-          "cond": {
-            "$eq": [ "$$item.i", id ]
+    {
+      "$project": {
+        "list": {
+          "$filter": {
+            "input": "$u",
+            "as": "item",
+            "cond": {
+              "$eq": ["$$item.i", id]
+            }
           }
         }
       }
-    }},
+    },
     { "$unwind": "$list" },
-    { "$group": {
+    {
+      "$group": {
         "_id": "$list.n",
         "count": {
-            "$count": {}
+          "$count": {}
         }
-    }}
+      }
+    }
   ])
 
   let names: { [key: string]: number } = {}
