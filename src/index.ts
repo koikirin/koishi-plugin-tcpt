@@ -137,7 +137,7 @@ async function queryNames(ctx: Context, id?: number, name?: string) {
 }
 
 export function apply(ctx: Context) {
-  ctx.command('tcpt <username:string>', '查询雀渣PT')
+  ctx.command('tcpt <username:rawtext>', '查询雀渣PT')
     .option('all', '-a')
     .option('common', '-c')
     .action(async ({ session, options }, username) => {
@@ -162,7 +162,7 @@ export function apply(ctx: Context) {
       query(ctx, null, username, filters).then(s => session.send(s ? s + extra : '查询失败'), e => session.send(`查询失败${e}`))
     })
 
-  ctx.command('tcpt/tcnames <username:string>', '查询雀渣曾用名')
+  ctx.command('tcpt/tcnames <username:rawtext>', '查询雀渣曾用名')
     .action(async ({ session }, username) => {
       if (!username) return session.execute('tcnames -h')
       const names = await queryNames(ctx, null, username)
