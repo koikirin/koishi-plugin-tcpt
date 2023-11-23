@@ -4,9 +4,13 @@ import { fillDocumentRounds } from './utils'
 export const name = 'tcpt'
 export const using = ['mahjong']
 
-export interface Config { }
+export interface Config {
+  eloOrigin: number
+ }
 
-export const Config: Schema<Config> = Schema.object({})
+export const Config: Schema<Config> = Schema.object({
+  eloOrigin: Schema.number().default(2000),
+})
 
 async function query(ctx: Context, id?: number, name?: string, filters: object = {}) {
   if (!id && !name) return
@@ -20,6 +24,7 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
 
   const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.i': id, ...filters }).sort('st', 'descending')
 
+  let elo: number
   const stats = {
     cnt: 0,
     cntr: 0,
@@ -49,6 +54,7 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
       if (u.i === id) {
         idx = _idx
         if (!name) name = u.n
+        if (!elo) elo = (ctx.config as Config).eloOrigin + u.e
         const r = u.r + 1
         stats[`r${r}`] += 1
         stats[`r${r}s`] += u.s
@@ -86,7 +92,7 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
   }
 
   const scores = stats.r1s + stats.r2s + stats.r3s + stats.r4s - stats.rps
-  const msg = `${name} 合计${stats.cnt}战 [${stats.r1}/${stats.r2}/${stats.r3}/${stats.r4}]
+  const msg = `${name} 合计${stats.cnt}战 [${stats.r1}/${stats.r2}/${stats.r3}/${stats.r4}] ${elo ? `ELO ${elo}` : ''}
 和率${p(stats.hule / stats.cntr)} 铳率${p(stats.chong / stats.cntr)} 平分${p(scores / stats.cntr, 'decimal')}
 自摸率${p(stats.tsumo / stats.hule)} 被摸率${p(stats.btsumo / stats.cntr)} 错和率${p(stats.cuohu / stats.cntr)}
 最近战绩 [${stats.trend.slice(0, 10).split('').reverse().join('')}]`
