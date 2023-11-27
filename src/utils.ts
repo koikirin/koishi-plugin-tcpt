@@ -55,6 +55,40 @@ function calcRP(v, f) {
   return a
 }
 
+// function fmt_tl(p, s, e, l) {
+//   let r = '' + p
+//   if (p !== s) { r += '/'; r += s }
+//   if (e || p === s) { r += '+'; r += e }
+//   if (l) { r += ' ('; r += (l * 5); r += ')' }
+//   return r
+// }
+
+function _getEloClass(doc: any) {
+  const [p, e] = [doc.g.r30, doc.g.e]
+  if (p <= 3) {
+    if (e <= 5) return 0
+    else if (e <= 10) return 1
+    else if (e <= 15) return 2
+    else return 3
+  } else if (p <= 5) {
+    if (e <= 0) return 1
+    else if (e <= 10) return 2
+    else if (e <= 15) return 3
+    else return 4
+  } else if (p <= 8) {
+    if (e <= 5) return 3
+    else return 4
+  } else if (p <= 10) {
+    if (e <= 0) return 3
+    else return 4
+  } else return 4
+}
+
+export function getEloClass(doc: any) {
+  const c = _getEloClass(doc)
+  return c <= 1 ? 0 : c <= 3 ? 1 : 2
+}
+
 export function fillDocumentRounds(doc: any): any {
   const rounds = []
   const bs = doc.g.b === undefined ? 8 : doc.g.b
