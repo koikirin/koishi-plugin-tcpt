@@ -1,15 +1,19 @@
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { Context, Schema } from 'koishi'
 import { fillDocumentRounds, getEloClass } from './utils'
+import { TziakchaLobby } from './lobby'
+
 export const name = 'tcpt'
 export const using = ['mahjong']
 
 export interface Config {
   eloOrigin: number
+  lobby: TziakchaLobby.Config
  }
 
 export const Config: Schema<Config> = Schema.object({
   eloOrigin: Schema.number().default(2000),
+  lobby: TziakchaLobby.Config,
 })
 
 async function query(ctx: Context, id?: number, name?: string, filters: object = {}) {
@@ -144,7 +148,7 @@ async function queryNames(ctx: Context, id?: number, name?: string) {
   return names
 }
 
-export function apply(ctx: Context) {
+export function apply(ctx: Context, config: Config) {
   ctx.command('tcpt <username:rawtext>', '查询雀渣PT')
     .option('all', '-a')
     .option('common', '-c')
@@ -177,4 +181,6 @@ export function apply(ctx: Context) {
       if (names && Object.values(names).length) return Object.entries(names).sort(([_1, x], [_2, y]) => y - x).map(([k, v], _) => `[${v}] ${k}`).join('\n')
       return '查询失败'
     })
+
+  ctx.plugin(TziakchaLobby, config)
 }

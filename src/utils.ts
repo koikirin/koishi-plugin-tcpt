@@ -55,13 +55,17 @@ function calcRP(v, f) {
   return a
 }
 
-// function fmt_tl(p, s, e, l) {
-//   let r = '' + p
-//   if (p !== s) { r += '/'; r += s }
-//   if (e || p === s) { r += '+'; r += e }
-//   if (l) { r += ' ('; r += (l * 5); r += ')' }
-//   return r
-// }
+function fmtTl(p, s, e, l) {
+  let r = '' + p
+  if (p !== s) { r += '/'; r += s }
+  if (e || p === s) { r += '+'; r += e }
+  if (l) { r += ' ('; r += (l * 5); r += ')' }
+  return r
+}
+
+export function formatTimeLimits(doc: any, limits: boolean = false) {
+  return fmtTl(doc.g.r30, doc.g.r12, doc.g.e, limits ? doc.g.l : 0)
+}
 
 function _getEloClass(doc: any) {
   const [p, e] = [doc.g.r30, doc.g.e]
@@ -88,6 +92,8 @@ export function getEloClass(doc: any) {
   const c = _getEloClass(doc)
   return c <= 1 ? 0 : c <= 3 ? 1 : 2
 }
+
+export const EloLabels = ['快速', '常规', '经典']
 
 export function fillDocumentRounds(doc: any): any {
   const rounds = []
