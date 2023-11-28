@@ -154,7 +154,7 @@ export class TziakchaLobby {
       g: data.g,
     }
     data.p.forEach(p => {
-      if (p) {
+      if (p && Object.values(p).length) {
         res.players.push({
           name: p.n,
           vip: p.v ?? 0,
@@ -166,7 +166,7 @@ export class TziakchaLobby {
 
     this.rooms[res.id] = res
     if (data.n === 0) {
-      logger.debug(`Wait: ${res.title} ${res.players.map(x => x.name).join(', ')}`)
+      logger.debug(`Wait: ${res.title} ${res.players.map(x => x?.name).join(', ')}`)
     } else {
       res.start_time = Date.now()
       logger.debug(`Play: ${res.title}`)
@@ -174,8 +174,9 @@ export class TziakchaLobby {
   }
 
   joinRoom(data) {
-    if (data.t.i in this.rooms) {
-      this.rooms[data.t.i].players[data.t.s] = {
+    const id = data.t.i
+    if (id in this.rooms) {
+      this.rooms[id].players[data.t.s] = {
         name: data.t.n,
         vip: data.t.v ?? 0,
       }
@@ -183,32 +184,36 @@ export class TziakchaLobby {
   }
 
   exitRoom(data) {
-    if (data.t.i in this.rooms) {
-      this.rooms[data.t.i].players[data.t.s] = null
+    const id = data.t.i
+    if (id in this.rooms) {
+      this.rooms[id].players[data.t.s] = null
     }
   }
 
   dismissRoom(data) {
-    if (data.t.i in this.rooms) {
-      logger.debug(`Dismiss: ${this.rooms[data.t.i].title}`)
-      delete this.rooms[data.t.i]
+    const id = data.t.i
+    if (id in this.rooms) {
+      logger.debug(`Dismiss: ${this.rooms[id].title}`)
+      delete this.rooms[id]
     }
   }
 
   startRoom(data) {
-    if (data.t.i in this.rooms) {
-      if (this.rooms[data.t.i].players.every(x => x)) {
-        this.rooms[data.t.i].rd_idx = 0
-        this.rooms[data.t.i].start_time = Date.now()
-        logger.debug(`Start: ${this.rooms[data.t.i].title}`)
+    const id = data.i
+    if (id in this.rooms) {
+      if (this.rooms[id].players.every(x => x)) {
+        this.rooms[id].rd_idx = 0
+        this.rooms[id].start_time = Date.now()
+        logger.debug(`Start: ${this.rooms[id].title}`)
         // delete this.rooms[data.t.i]
       }
     }
   }
 
   updateRoom(data) {
-    if (data.t.i in this.rooms) {
-      this.rooms[data.t.i].rd_idx = data.p
+    const id = data.i
+    if (id in this.rooms) {
+      this.rooms[id].rd_idx = data.p
     }
   }
 
@@ -247,8 +252,8 @@ export namespace TziakchaLobby {
   export const using = ['mahjong']
 
   export interface Config {
-    username: string
-    password: string
+    username?: string
+    password?: string
     reconnectTimes: number
     reconnectInterval: number
     heartbeatInterval: number
@@ -256,8 +261,8 @@ export namespace TziakchaLobby {
   }
 
   export const Config: Schema<Config> = Schema.object({
-    username: Schema.string(),
-    password: Schema.string().role('secret'),
+    username: Schema.string().required(false),
+    password: Schema.string().role('secret').required(false),
     reconnectTimes: Schema.number().default(10),
     reconnectInterval: Schema.number().role('ms').default(60000),
     heartbeatInterval: Schema.number().role('ms').default(30000),
