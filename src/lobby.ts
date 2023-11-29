@@ -73,19 +73,17 @@ export class TziakchaLobby {
 
     ctx.collect('ws', () => {
       this.closed = true
-      this.#ws?.close()
-      this.#ws = null
+      try { this.#ws?.close() } finally { this.#ws = null }
     })
   }
 
   connect() {
-    this.#ws?.close()
+    try { this.#ws?.close() } catch {}
     this.#ws = this.ctx.http.ws('ws://www.tziakcha.xyz:5333/ws')
     this.#ws.on('message', this.#receive.bind(this))
     this.#ws.on('error', (e) => {
       if (!e.message.includes('invalid status code')) logger.warn(e)
-      this.#ws?.close()
-      this.#ws = null
+      try { this.#ws?.close() } finally { this.#ws = null }
       this.#connectRetries += 1
       if (this.#connectRetries > this.config.reconnectTimes) {
         logger.warn('Error occurs and exceed max retries')
@@ -95,8 +93,7 @@ export class TziakchaLobby {
     })
     this.#ws.on('close', () => {
       logger.info('Disconnect')
-      this.#ws?.close()
-      this.#ws = null
+      try { this.#ws?.close() } finally { this.#ws = null }
       this.#connectRetries += 1
 
       if (this.#connectRetries > this.config.reconnectTimes) {
@@ -121,7 +118,11 @@ export class TziakchaLobby {
       this.#ws.send(JSON.stringify({
         m: 1,
         r: 2,
-      }), (e) => e || logger.info('Connected to server'))
+      }), (e) => {
+        if (e) return
+        this.#connectRetries = 0
+        logger.info('Connected to server')
+      })
     })
 
     this.#heartbeat?.()
@@ -174,12 +175,17 @@ export class TziakchaLobby {
   }
 
   joinRoom(data) {
-    const id = data.t.i
+    let id = data.t.i
     if (id in this.rooms) {
       this.rooms[id].players[data.t.s] = {
         name: data.t.n,
         vip: data.t.v ?? 0,
       }
+    }
+    if (!data.f) return
+    id = data.f.i
+    if (id in this.rooms) {
+      this.rooms[id].players[data.f.s] = null
     }
   }
 
@@ -220,6 +226,7 @@ export class TziakchaLobby {
   #receive(data: any) {
     const packet = JSON.parse(data)
     const op = packet.m
+    if (packet.s?.f !== undefined) this.stats = packet.s
     if (op === 5) {
       if (packet.t === this.#lastHeartbeat) this.#lastHeartbeat = 0
     } else if (op === 1 && packet.r === 1) {
@@ -236,9 +243,8 @@ export class TziakchaLobby {
       // Ready
     } else if (op === 1 && packet.r === 7) {
       this.dismissRoom(packet)
-      if (packet.s) this.stats = packet.s
     } else if (op === 1 && packet.r === 8) {
-      this.stats = packet.s
+      // Stats update
     } else if (op === 1 && packet.r === 13) {
       if (packet.p === 1) this.startRoom(packet)
       else this.updateRoom(packet)
