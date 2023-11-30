@@ -121,6 +121,7 @@ export class TziakchaLobby {
       }), (e) => {
         if (e) return
         this.#connectRetries = 0
+        this.rooms = {}
         logger.info('Connected to server')
       })
     })

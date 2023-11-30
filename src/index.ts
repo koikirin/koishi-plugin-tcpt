@@ -4,7 +4,7 @@ import { fillDocumentRounds, getEloClass } from './utils'
 import { TziakchaLobby } from './lobby'
 
 export const name = 'tcpt'
-export const using = ['mahjong']
+export const inject = ['mahjong', 'mahjong.database']
 
 export interface Config {
   eloOrigin: number
