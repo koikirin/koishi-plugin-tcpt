@@ -25,6 +25,7 @@ async function query(ctx: Context, id?: number, name?: string, filters: object =
       for (const u of doc.u) if (u.n === name) id = u.i
     } else return
   }
+  name = undefined
 
   const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.i': id, ...filters }).sort('st', 'descending')
 
