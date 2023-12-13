@@ -29,11 +29,12 @@ interface Room {
   rd_cnt: number
   players: Player[]
   g: any
+  password: boolean
   start_time?: number
 }
 
 function formatWaitingRoom(room: Room) {
-  return `[${formatTimeLimits(room)}] ${room.title} (${room.players.map(x => x?.name ?? '').join(', ')})`
+  return `${room.password ? '🔒' : ''}[${formatTimeLimits(room)}] ${room.title} (${room.players.map(x => x?.name ?? '').join(', ')})`
 }
 
 function formatPlayingRoom(room: Room) {
@@ -154,6 +155,7 @@ export class TziakchaLobby {
       rd_cnt: data.g.n,
       players: [],
       g: data.g,
+      password: data.u,
     }
     data.p.forEach(p => {
       if (p && Object.values(p).length) {
