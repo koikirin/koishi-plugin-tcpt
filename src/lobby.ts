@@ -53,29 +53,30 @@ export class TziakchaLobby {
   #lastHeartbeat: number = 0
 
   constructor(private ctx: Context, private config: TziakchaLobby.Config) {
-    ctx.command('tcpt/tcwait', '查看待机')
-      .action(() => {
-        return `- 大厅[${this.stats.f}/${this.stats.w}]：\n` + Object.values(this.rooms).filter(x => !x.start_time).map(formatWaitingRoom).join('\n')
-      })
-
-    ctx.command('tcpt/tcplay', '查看对局')
-      .action(() => {
-        return `- 对局[${(this.stats.p + this.stats.o) / 4}]：\n` + Object.values(this.rooms).filter(x => x.start_time).map(formatPlayingRoom).join('\n')
-      })
-
-    ctx.command('tcpt/tclobby', '查看大厅')
-      .action(() => {
-        return `- 大厅[${this.stats.f}/${this.stats.w}]：\n` + Object.values(this.rooms).filter(x => !x.start_time).map(formatWaitingRoom).join('\n') + '\n'
-        + `- 对局[${(this.stats.p + this.stats.o) / 4}]：\n` + Object.values(this.rooms).filter(x => x.start_time).map(formatPlayingRoom).join('\n')
+    ctx.command('tcpt/tclobby')
+      .option('wait', '-w')
+      .option('play', '-p')
+      .alias('tcwait', { options: { wait: true, play: false } })
+      .alias('tcplay', { options: { wait: false, play: true } })
+      .action(({ session, options }) => {
+        const wait = `- ${session.text('.wait')}[${this.stats.f}/${this.stats.w}]：\n`
+          + Object.values(this.rooms).filter(x => !x.start_time).map(formatWaitingRoom).join('\n')
+        const play = `- ${session.text('.play')}[${(this.stats.p + this.stats.o) / 4}]：\n`
+          + Object.values(this.rooms).filter(x => x.start_time).map(formatPlayingRoom).join('\n')
+        if (options.wait && options.play) return wait + '\n' + play
+        if (options.wait) return wait
+        else if (options.play) return play
+        else return wait + '\n' + play
       })
 
     ctx.on('ready', async () => {
-      this.connect()
-    })
-
-    ctx.collect('ws', () => {
-      this.closed = true
-      try { this.#ws?.close() } finally { this.#ws = null }
+      ctx.effect(() => {
+        this.connect()
+        return () => {
+          this.closed = true
+          try { this.#ws?.close() } finally { this.#ws = null }
+        }
+      })
     })
   }
 

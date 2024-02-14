@@ -1,0 +1,26 @@
+commands:
+  tcpt:
+    description: 查询雀渣PT
+    options:
+      bind: 绑定/清除当前用户
+    messages:
+      failed: 查询失败
+      extra-all:
+      extra-common: "*仅计入8(8)"
+      extra-default: "*仅计入完场全庄"
+      zero-hule: 错误：账号胡率为0
+      output: |
+        {name} 合计{stats.cnt}战 [{stats.r1}/{stats.r2}/{stats.r3}/{stats.r4}]
+        ELO [{elo.map(x => x ? String(x) : config.eloOrigin).join('/')}]
+        和率{p(stats.hule / stats.cntr)} 铳率{p(stats.chong / stats.cntr)} 平分{p(scores / stats.cntr, 'decimal')}
+        自摸率{p(stats.tsumo / stats.hule)} 被摸率{p(stats.btsumo / stats.cntr)} 错和率{p(stats.cuohu / stats.cntr)}
+        最近战绩 [{stats.trend.slice(0, 10).split('').reverse().join('')}]
+  tcnames:
+    description: 查询雀渣曾用名
+    messages:
+      failed: 查询失败
+  tclobby:
+    descriptions: 查看大厅
+    messages:
+      wait: 大厅
+      play: 对局
