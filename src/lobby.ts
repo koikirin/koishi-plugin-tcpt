@@ -1,4 +1,5 @@
 import { } from '@hieuzest/koishi-plugin-mahjong'
+import { } from '@cordisjs/timer'
 import { Context, Dict, Disposable, Logger, Schema } from 'koishi'
 import { WebSocket } from 'ws'
 import { formatTimeLimits } from './utils'

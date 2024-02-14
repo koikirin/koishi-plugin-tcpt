@@ -3,6 +3,12 @@ import { Context, Schema } from 'koishi'
 import { fillDocumentRounds, getEloClass } from './utils'
 import { TziakchaLobby } from './lobby'
 
+declare module 'koishi' {
+  interface User {
+    'tcpt/bind': string
+  }
+}
+
 export const name = 'tcpt'
 export const inject = ['mahjong', 'mahjong.database']
 
@@ -150,10 +156,18 @@ async function queryNames(ctx: Context, id?: number, name?: string) {
 }
 
 export function apply(ctx: Context, config: Config) {
+  ctx.model.extend('user', {
+    'tcpt/bind': 'string',
+  })
+
   ctx.command('tcpt <username:rawtext>', '查询雀渣PT')
     .option('all', '-a')
     .option('common', '-c')
+    .option('bind', '-b', { descPath: '绑定至当前用户' })
+    .userFields(['tcpt/bind'])
     .action(async ({ session, options }, username) => {
+      if (options.bind) session.user['tcpt/bind'] = username ?? ''
+      username ||= session.user['tcpt/bind']
       if (!username) return session.execute('tcpt -h')
       let filters: object = {
         'g.n': 16,
@@ -172,7 +186,8 @@ export function apply(ctx: Context, config: Config) {
         }
         extra = '\n*仅计入8(8)'
       }
-      query(ctx, null, username, filters).then(s => session.send(s ? s + extra : '查询失败'), e => session.send(`查询失败${e}`))
+      query(ctx, username.startsWith('$') ? +username.slice(1) : undefined, username, filters)
+        .then(s => session.send(s ? s + extra : '查询失败'), e => session.send(`查询失败${e}`))
     })
 
   ctx.command('tcpt/tcnames <username:rawtext>', '查询雀渣曾用名')
