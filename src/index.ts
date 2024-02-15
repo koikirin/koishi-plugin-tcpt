@@ -104,7 +104,6 @@ export class Tcpt {
           if (!name) name = u.n
           if (!elo[eloClass] && typeof u.e === 'number') {
             elo[eloClass] = this.config.eloOrigin + u.l + u.e
-            console.log(elo, this.config.eloOrigin, u.l, u.e)
           }
           const r = u.r + 1
           stats[`r${r}`] += 1

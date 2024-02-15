@@ -5,7 +5,7 @@ commands:
       bind: 绑定/清除当前用户
     messages:
       failed: 查询失败
-      extra-all:
+      extra-all: ""
       extra-common: "*仅计入8(8)"
       extra-default: "*仅计入完场全庄"
       zero-hule: 错误：账号胡率为0
