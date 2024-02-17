@@ -87,12 +87,6 @@ export class TziakchaLobby {
     this.#ws.on('error', (e) => {
       if (!e.message.includes('invalid status code')) logger.warn(e)
       try { this.#ws?.close() } finally { this.#ws = null }
-      this.#connectRetries += 1
-      if (this.#connectRetries > this.config.reconnectTimes) {
-        logger.warn('Error occurs and exceed max retries')
-      } else if (!this.closed) {
-        this.ctx.setTimeout(this.connect.bind(this), this.config.reconnectInterval)
-      }
     })
     this.#ws.on('close', () => {
       logger.info('Disconnect')
@@ -130,6 +124,7 @@ export class TziakchaLobby {
     })
 
     this.#heartbeat?.()
+    this.#lastHeartbeat = 0
     this.#heartbeat = this.ctx.setInterval(() => {
       if (!this.closed && this.#ws) {
         try {

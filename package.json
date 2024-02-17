@@ -1,27 +1,27 @@
 {
   "name": "@hieuzest/koishi-plugin-tcpt",
   "description": "Query Tziakcha PT",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
     "lib",
     "dist"
   ],
+  "author": "Hieuzest <girkirin@hotmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koikirin/koishi-plugin-tcpt.git"
+  },
+  "homepage": "https://github.com/koikirin/koishi-plugin-tcpt",
   "keywords": [
     "chatbot",
     "koishi",
-    "plugin"
+    "plugin",
+    "tziakcha"
   ],
   "peerDependencies": {
     "koishi": "^4.16.1"
-  },
-  "koishi": {
-    "service": {
-      "required": [
-        "mahjong"
-      ]
-    }
   }
 }

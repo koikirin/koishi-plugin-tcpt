@@ -190,7 +190,7 @@ export class Tcpt {
 }
 
 export namespace Tcpt {
-  export const inject = ['mahjong', 'mahjong.database']
+  export const inject = ['database', 'mahjong', 'mahjong.database']
 
   export interface Config {
     eloOrigin: number
