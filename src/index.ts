@@ -17,7 +17,7 @@ export class Tcpt {
       'tcpt/bind': 'string',
     })
 
-    ctx.command('tcpt <username:rawtext>')
+    ctx.command('tcpt [username:rawtext]')
       .option('all', '-a')
       .option('common', '-c')
       .option('bind', '-b')
@@ -133,12 +133,8 @@ export class Tcpt {
 
     if (stats.hule === 0) { return session.text('.zero-hule') }
 
-    function p(num: number, style = 'percent'): string {
-      return new Intl.NumberFormat('default', {
-        style,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(num)
+    function p(num: number, style: 'percent' | 'decimal' = 'percent'): string {
+      return style === 'percent' ? (num * 100).toFixed(2) + '%' : num.toFixed(2)
     }
 
     const scores = stats.r1s + stats.r2s + stats.r3s + stats.r4s - stats.rps
