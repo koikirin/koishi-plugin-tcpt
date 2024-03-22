@@ -25,7 +25,7 @@ export class Tcpt {
       .action(async ({ session, options }, username) => {
         if (options.bind) session.user['tcpt/bind'] = username ?? ''
         username ||= session.user['tcpt/bind']
-        if (!username) return options.bind ? '' : session.execute('tcpt -h')
+        if (!username) return options.bind ? '' : session.execute('help tcpt')
         let filters: object = {
           'g.n': 16,
           'g.l': 8,
@@ -49,7 +49,7 @@ export class Tcpt {
 
     ctx.command('tcpt/tcnames <username:rawtext>')
       .action(async ({ session }, username) => {
-        if (!username) return session.execute('tcnames -h')
+        if (!username) return session.execute('help tcnames')
         const names = await this.queryNames(ctx, null, username)
         if (names && Object.values(names).length) return Object.entries(names).sort(([_1, x], [_2, y]) => y - x).map(([k, v], _) => `[${v}] ${k}`).join('\n')
         return session.text('.failed')
