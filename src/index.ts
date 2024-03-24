@@ -1,5 +1,7 @@
+import { Context, Dict, h, Schema, Session } from 'koishi'
+import { CanvasTable } from '@hieuzest/canvas-table'
+import { } from '@koishijs/canvas'
 import { } from '@hieuzest/koishi-plugin-mahjong'
-import { Context, Schema, Session } from 'koishi'
 import { fillDocumentRounds, getEloClass } from './utils'
 import { TziakchaLobby } from './lobby'
 
@@ -43,31 +45,52 @@ export class Tcpt {
           }
           extra = session.text('.extra-common')
         }
-        const res = await this.query(session, username.startsWith('$') ? +username.slice(1) : undefined, username, filters)
+        const res = await this.query(session, username.startsWith('$') ? +username.slice(1) : await this.queryId(username), filters)
         return res ? res + (extra ? '\n' + extra : '') : session.text('.failed')
       })
 
     ctx.command('tcpt/tcnames <username:rawtext>')
       .action(async ({ session }, username) => {
         if (!username) return session.execute('help tcnames')
-        const names = await this.queryNames(ctx, null, username)
+        const names = await this.queryNames(await this.queryId(username))
         if (names && Object.values(names).length) return Object.entries(names).sort(([_1, x], [_2, y]) => y - x).map(([k, v], _) => `[${v}] ${k}`).join('\n')
         return session.text('.failed')
+      })
+
+    ctx.command('tcpt/tcagainst <pattern:rawtext>')
+      .alias('tcag')
+      .action(async ({ session }, pattern) => {
+        const usernames = pattern?.split(/\s+/)
+        if (!usernames?.length || (!session.user['tcpt/bind'] && usernames.length < 2)) return session.execute('help tcagainst')
+        const username = usernames.length === 2 ? usernames[0] : session.user['tcpt/bind']
+        const target = usernames[usernames.length - 1]
+        const id = await this.queryId(username), targetId = await this.queryId(target)
+        const stats = await this.queryAgainsts(id, {}, { target: targetId })
+        return await this.formatAgainst(stats, `${username} 的同桌统计`)
+      })
+
+    ctx.command('tcpt/tcagainsts [username:rawtext]')
+      .alias('tcags')
+      .option('count', '-n <number>', { fallback: 10 })
+      .action(async ({ session, options }, username) => {
+        username ||= session.user['tcpt/bind']
+        if (!username) return session.execute('help tcagainsts')
+        const id = await this.queryId(username)
+        const stats = await this.queryAgainsts(id, {}, { mincnt: options.count })
+        return await this.formatAgainst(stats, `${username} 的同桌统计`)
       })
 
     ctx.plugin(TziakchaLobby, config)
   }
 
-  async query(session: Session, id?: number, name?: string, filters: object = {}) {
-    if (!id && !name) return
-    else if (!id) {
-      const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.n': name }).sort('st', 'descending').limit(1)
-      const doc = await cursor.next()
-      if (doc) {
-        for (const u of doc.u) if (u.n === name) id = u.i
-      } else return
-    }
-    name = undefined
+  async queryId(name: string) {
+    const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.n': name }).sort('st', 'descending').limit(1)
+    const doc = await cursor.next()
+    if (doc) for (const u of doc.u) if (u.n === name) return u.i
+  }
+
+  async query(session: Session, id: number, filters: object = {}) {
+    let name: string
 
     const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.i': id, ...filters }).sort('st', 'descending')
 
@@ -141,17 +164,8 @@ export class Tcpt {
     return session.text('.output', { p, config: this.config, elo, name, scores, stats })
   }
 
-  async queryNames(ctx: Context, id?: number, name?: string) {
-    if (!id && !name) return
-    else if (!id) {
-      const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.n': name }).sort('st', 'descending').limit(1)
-      const doc = await cursor.next()
-      if (doc) {
-        for (const u of doc.u) if (u.n === name) id = u.i
-      } else return
-    }
-
-    const cursor = ctx.mahjong.database.db('tziakcha').collection('matches').aggregate([
+  async queryNames(id: number) {
+    const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches').aggregate([
       { '$match': { 'u.i': id } },
       {
         '$project': {
@@ -183,10 +197,192 @@ export class Tcpt {
     }
     return names
   }
+
+  async queryAgainsts(id: number, filters: object = {}, options: {
+    mincnt?: number
+    target?: number
+  } = {}): Promise<Tcpt.Against[]> {
+    const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches')
+      .find({ 'u.i': options.target ? { $all: [id, options.target] } : id, ...filters })
+      .sort('st', 'descending')
+    const stats = {
+      cnt: 0,
+      cntr: 0,
+      win: 0,
+      r1: 0,
+      r2: 0,
+      r3: 0,
+      r4: 0,
+      rs: 0,
+      rr1: 0,
+      rr2: 0,
+      rr3: 0,
+      rr4: 0,
+      rrs: 0,
+    }
+    const rs: Dict<Tcpt.Against> = Object.create(null)
+
+    for await (let doc of cursor) {
+      doc = fillDocumentRounds(doc)
+      stats.cnt += 1
+      stats.cntr += doc.rounds.length
+      let idx = -1
+      doc.u.forEach((u, _idx) => {
+        if (u.i === id) idx = _idx
+      })
+      doc.u.forEach((u, _idx) => {
+        rs[u.i] ??= { id: u.i, name: u.n, cnt: 0, m1: 0, m2: 0, m3: 0, m4: 0, ms: 0, r1: 0, r2: 0, r3: 0, r4: 0, rs: 0, win: 0, value: 0 }
+        rs[u.i].cnt += 1
+        rs[u.i][`m${doc.u[idx].r + 1}`] += 1
+        rs[u.i].ms += doc.u[idx].s
+        rs[u.i][`r${u.r + 1}`] += 1
+        rs[u.i].rs += u.s
+        rs[u.i].win += u.r < doc.u[idx].r ? 1 : 0
+        rs[u.i].value += u.r - doc.u[idx].r
+      })
+    }
+    const list = Object.entries(rs)
+      .map(([i, x]) => ({ i, ...x }))
+      .filter(x => x.id !== id && (!options.target || x.id === options.target) && x.cnt >= (options.mincnt ?? 0))
+      .sort((a, b) => b.value - a.value)
+    return list
+  }
+
+  async formatAgainst(stats: Tcpt.Against[], title: string = '') {
+    if (this.ctx.get('canvas')) return this.formatAgainstCanvas(stats, title)
+    else return this.formatAgainstHtml(stats, title)
+  }
+
+  async formatAgainstCanvas(stats: Tcpt.Against[], title: string = '') {
+    function p(num: number, style: 'percent' | 'decimal' = 'percent'): string {
+      return style === 'percent' ? (num * 100).toFixed(2) + '%' : num.toFixed(2)
+    }
+
+    const headers = ['排名', '玩家', '仇恨值', '场次', '胜率', '自己平顺', '自己平分', '自己位次', '对手平顺', '对手平分', '对手位次']
+
+    const data = stats.map((x, i) => [i + 1, x.name, x.value, x.cnt, p(x.win / x.cnt, 'percent'),
+      p((x.r1 + 2 * x.r2 + 3 * x.r3 + 4 * x.r4) / x.cnt, 'decimal'), p(x.rs / x.cnt, 'decimal'), `${x.r1}/${x.r2}/${x.r3}/${x.r4}`,
+      p((x.m1 + 2 * x.m2 + 3 * x.m3 + 4 * x.m4) / x.cnt, 'decimal'), p(x.ms / x.cnt, 'decimal'), `${x.m1}/${x.m2}/${x.m3}/${x.m4}`,
+    ].map(x => x.toString()))
+
+    const table = new CanvasTable(this.ctx.canvas.createCanvas(640, (title ? 72 : 48) + 24.5 * data.length) as any, {
+      columns: headers.map(x => ({ title: x })),
+      data,
+      options: {
+        header: {
+          fontFamily: 'Microsoft YaHei, sans-serif',
+          textAlign: 'center',
+        },
+        cell: {
+          fontFamily: 'Microsoft YaHei, sans-serif',
+          textAlign: 'center',
+        },
+        title: {
+          text: title,
+          fontFamily: 'Microsoft YaHei, sans-serif',
+          textAlign: 'left',
+        },
+      },
+    })
+    await table.generateTable()
+    return h.image(await table.renderToBuffer('image/png'), 'image/png')
+  }
+
+  async formatAgainstHtml(stats: Tcpt.Against[], title: string = '') {
+    function p(num: number, style: 'percent' | 'decimal' = 'percent'): string {
+      return style === 'percent' ? (num * 100).toFixed(2) + '%' : num.toFixed(2)
+    }
+
+    const headers = ['排名', '玩家', '仇恨值', '场次', '胜率', '自己平顺', '自己平分', '自己位次', '对手平顺', '对手平分', '对手位次']
+
+    const table = `<h2>${title}</h2>
+    <table class="gridtable">
+        <tr> ${headers.map(x => `<th>${x}</th>`).join('')} </tr>
+    ${stats.map((x, i) => `<tr>${[i + 1, x.name, x.value, x.cnt, p(x.win / x.cnt, 'percent'),
+    p((x.r1 + 2 * x.r2 + 3 * x.r3 + 4 * x.r4) / x.cnt, 'decimal'), p(x.rs / x.cnt, 'decimal'), `${x.r1}/${x.r2}/${x.r3}/${x.r4}`,
+    p((x.m1 + 2 * x.m2 + 3 * x.m3 + 4 * x.m4) / x.cnt, 'decimal'), p(x.ms / x.cnt, 'decimal'), `${x.m1}/${x.m2}/${x.m3}/${x.m4}`,
+  ].map(x => `<td>${x}</td>`).join('')}</tr>`).join('\n')}
+        `
+    return `<html>
+        <style type="text/css">
+                /* gridtable */
+                table.gridtable {
+                    font-family: verdana,arial,sans-serif;
+                    font-size: 12px;
+                    color: #333333;
+                    border-width: 1px;
+                    border-color: #666666;
+                    border-collapse: collapse;
+                }
+
+                table.gridtable th {
+                    border-width: 1px;
+                    padding: 8px;
+                    border-style: solid;
+                    border-color: #666666;
+                    background-color: #dedede;
+                }
+
+                table.gridtable td {
+                    border-width: 1px;
+                    padding: 8px;
+                    border-style: solid;
+                    border-color: #666666;
+                }
+
+                table.gridtable tr:nth-child(even) {
+                    background-color: #f2f2f2;
+                }
+
+                table.gridtable tr:nth-child(odd) {
+                    background-color: #ffffff;
+                }
+
+                table.gridtable tr.highlight {
+                    background-color: #ffcc33cc;
+                }
+
+                table.gridtable tr.lowlight {
+                    background-color: #669900cc;
+                }
+
+                table.gridtable tr.upgrade {
+                    background-color: #ff9999cc;
+                }
+
+                table.gridtable tr.downgrade {
+                    background-color: #99ff99cc;
+                }
+
+                /* /gridtable */
+            </style>
+        <body>${table}</body></html>`
+  }
 }
 
 export namespace Tcpt {
-  export const inject = ['database', 'mahjong', 'mahjong.database']
+  export const inject = {
+    required: ['database', 'mahjong', 'mahjong.database'],
+    optional: ['canvas'],
+  }
+
+  export interface Against {
+    id: number
+    name: string
+    cnt: number
+    m1: number
+    m2: number
+    m3: number
+    m4: number
+    ms: number
+    r1: number
+    r2: number
+    r3: number
+    r4: number
+    rs: number
+    win: number
+    value: number
+  }
 
   export interface Config {
     eloOrigin: number

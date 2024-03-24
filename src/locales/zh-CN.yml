@@ -1,8 +1,7 @@
 commands:
   tcpt:
-    description: |
-      查询雀渣PT
-      *平分与摆设算法不同，未作标准化处理，仅供参考
+    description: 查询雀渣PT
+    usage: "*平分与摆设算法不同，未作标准化处理，仅供参考"
     options:
       bind: 绑定/清除当前用户
     messages:
@@ -26,3 +25,13 @@ commands:
     messages:
       wait: 大厅
       play: 对局
+  tcagainst:
+    description: 记仇
+    usage: |
+      tcag SELF OTHER
+      已绑定用户时：tcag OTHER
+  tcagainsts:
+    description: 查询同桌统计
+    usage: 省略参数时为已绑定用户
+    options:
+      count: 至少同桌次数（默认为10）
