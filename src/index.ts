@@ -59,6 +59,7 @@ export class Tcpt {
 
     ctx.command('tcpt/tcagainst <pattern:rawtext>')
       .alias('tcag')
+      .userFields(['tcpt/bind'])
       .action(async ({ session }, pattern) => {
         const usernames = pattern?.split(/\s+/)
         if (!usernames?.length || (!session.user['tcpt/bind'] && usernames.length < 2)) return session.execute('help tcagainst')
@@ -72,11 +73,15 @@ export class Tcpt {
     ctx.command('tcpt/tcagainsts [username:rawtext]')
       .alias('tcags')
       .option('count', '-n <number>', { fallback: 10 })
+      .userFields(['tcpt/bind'])
       .action(async ({ session, options }, username) => {
         username ||= session.user['tcpt/bind']
         if (!username) return session.execute('help tcagainsts')
         const id = await this.queryId(username)
-        const stats = await this.queryAgainsts(id, {}, { mincnt: options.count })
+        let stats = await this.queryAgainsts(id, {}, { mincnt: options.count })
+        if (stats.length > config.maxAgainstsTop + config.maxAgainstsBottom) {
+          stats = [...stats.slice(0, config.maxAgainstsTop), ...stats.slice(-config.maxAgainstsBottom)]
+        }
         return await this.formatAgainst(stats, `${username} 的同桌统计`)
       })
 
@@ -205,33 +210,16 @@ export class Tcpt {
     const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches')
       .find({ 'u.i': options.target ? { $all: [id, options.target] } : id, ...filters })
       .sort('st', 'descending')
-    const stats = {
-      cnt: 0,
-      cntr: 0,
-      win: 0,
-      r1: 0,
-      r2: 0,
-      r3: 0,
-      r4: 0,
-      rs: 0,
-      rr1: 0,
-      rr2: 0,
-      rr3: 0,
-      rr4: 0,
-      rrs: 0,
-    }
     const rs: Dict<Tcpt.Against> = Object.create(null)
 
     for await (let doc of cursor) {
       doc = fillDocumentRounds(doc)
-      stats.cnt += 1
-      stats.cntr += doc.rounds.length
       let idx = -1
       doc.u.forEach((u, _idx) => {
         if (u.i === id) idx = _idx
       })
       doc.u.forEach((u, _idx) => {
-        rs[u.i] ??= { id: u.i, name: u.n, cnt: 0, m1: 0, m2: 0, m3: 0, m4: 0, ms: 0, r1: 0, r2: 0, r3: 0, r4: 0, rs: 0, win: 0, value: 0 }
+        rs[u.i] ??= { id: u.i, name: u.n, rank: 0, cnt: 0, m1: 0, m2: 0, m3: 0, m4: 0, ms: 0, r1: 0, r2: 0, r3: 0, r4: 0, rs: 0, win: 0, value: 0 }
         rs[u.i].cnt += 1
         rs[u.i][`m${doc.u[idx].r + 1}`] += 1
         rs[u.i].ms += doc.u[idx].s
@@ -245,6 +233,7 @@ export class Tcpt {
       .map(([i, x]) => ({ i, ...x }))
       .filter(x => x.id !== id && (!options.target || x.id === options.target) && x.cnt >= (options.mincnt ?? 0))
       .sort((a, b) => b.value - a.value)
+      .map((x, i) => ({ ...x, rank: i + 1 }))
     return list
   }
 
@@ -260,26 +249,27 @@ export class Tcpt {
 
     const headers = ['排名', '玩家', '仇恨值', '场次', '胜率', '自己平顺', '自己平分', '自己位次', '对手平顺', '对手平分', '对手位次']
 
-    const data = stats.map((x, i) => [i + 1, x.name, x.value, x.cnt, p(x.win / x.cnt, 'percent'),
-      p((x.r1 + 2 * x.r2 + 3 * x.r3 + 4 * x.r4) / x.cnt, 'decimal'), p(x.rs / x.cnt, 'decimal'), `${x.r1}/${x.r2}/${x.r3}/${x.r4}`,
+    const data = stats.map(x => [x.rank, x.name, x.value, x.cnt, p(x.win / x.cnt, 'percent'),
       p((x.m1 + 2 * x.m2 + 3 * x.m3 + 4 * x.m4) / x.cnt, 'decimal'), p(x.ms / x.cnt, 'decimal'), `${x.m1}/${x.m2}/${x.m3}/${x.m4}`,
+      p((x.r1 + 2 * x.r2 + 3 * x.r3 + 4 * x.r4) / x.cnt, 'decimal'), p(x.rs / x.cnt, 'decimal'), `${x.r1}/${x.r2}/${x.r3}/${x.r4}`,
     ].map(x => x.toString()))
 
-    const table = new CanvasTable(this.ctx.canvas.createCanvas(640, (title ? 72 : 48) + 24.5 * data.length) as any, {
+    const table = new CanvasTable(this.ctx.canvas.createCanvas(600, (title ? 72 : 48) + 18.5 * data.length) as any, {
       columns: headers.map(x => ({ title: x })),
       data,
       options: {
         header: {
-          fontFamily: 'Microsoft YaHei, sans-serif',
+          fontFamily: this.config.fontFamily,
           textAlign: 'center',
         },
         cell: {
-          fontFamily: 'Microsoft YaHei, sans-serif',
+          fontFamily: this.config.fontFamily,
           textAlign: 'center',
+          padding: 2,
         },
         title: {
           text: title,
-          fontFamily: 'Microsoft YaHei, sans-serif',
+          fontFamily: this.config.fontFamily,
           textAlign: 'left',
         },
       },
@@ -298,9 +288,9 @@ export class Tcpt {
     const table = `<h2>${title}</h2>
     <table class="gridtable">
         <tr> ${headers.map(x => `<th>${x}</th>`).join('')} </tr>
-    ${stats.map((x, i) => `<tr>${[i + 1, x.name, x.value, x.cnt, p(x.win / x.cnt, 'percent'),
-    p((x.r1 + 2 * x.r2 + 3 * x.r3 + 4 * x.r4) / x.cnt, 'decimal'), p(x.rs / x.cnt, 'decimal'), `${x.r1}/${x.r2}/${x.r3}/${x.r4}`,
+    ${stats.map(x => `<tr>${[x.rank, x.name, x.value, x.cnt, p(x.win / x.cnt, 'percent'),
     p((x.m1 + 2 * x.m2 + 3 * x.m3 + 4 * x.m4) / x.cnt, 'decimal'), p(x.ms / x.cnt, 'decimal'), `${x.m1}/${x.m2}/${x.m3}/${x.m4}`,
+    p((x.r1 + 2 * x.r2 + 3 * x.r3 + 4 * x.r4) / x.cnt, 'decimal'), p(x.rs / x.cnt, 'decimal'), `${x.r1}/${x.r2}/${x.r3}/${x.r4}`,
   ].map(x => `<td>${x}</td>`).join('')}</tr>`).join('\n')}
         `
     return `<html>
@@ -369,6 +359,7 @@ export namespace Tcpt {
   export interface Against {
     id: number
     name: string
+    rank: number
     cnt: number
     m1: number
     m2: number
@@ -387,11 +378,17 @@ export namespace Tcpt {
   export interface Config {
     eloOrigin: number
     lobby: TziakchaLobby.Config
+    fontFamily: string
+    maxAgainstsTop: number
+    maxAgainstsBottom: number
    }
 
   export const Config: Schema<Config> = Schema.object({
     eloOrigin: Schema.number().default(2000),
     lobby: TziakchaLobby.Config,
+    fontFamily: Schema.string().default('Microsoft YaHei, sans-serif'),
+    maxAgainstsTop: Schema.number().default(20),
+    maxAgainstsBottom: Schema.number().default(10),
   })
 }
 
