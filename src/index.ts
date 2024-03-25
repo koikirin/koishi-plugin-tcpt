@@ -225,8 +225,8 @@ export class Tcpt {
         rs[u.i].ms += doc.u[idx].s
         rs[u.i][`r${u.r + 1}`] += 1
         rs[u.i].rs += u.s
-        rs[u.i].win += u.r < doc.u[idx].r ? 1 : 0
-        rs[u.i].value += u.r - doc.u[idx].r
+        rs[u.i].win += doc.u[idx].r < u.r ? 1 : 0
+        rs[u.i].value += doc.u[idx].r - u.r
       })
     }
     const list = Object.entries(rs)
