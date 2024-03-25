@@ -269,10 +269,10 @@ export namespace TziakchaLobby {
   export const Config: Schema<Config> = Schema.object({
     username: Schema.string().required(false),
     password: Schema.string().role('secret').required(false),
-    reconnectTimes: Schema.number().default(10),
+    reconnectTimes: Schema.natural().default(10),
     reconnectInterval: Schema.number().role('ms').default(60000),
     heartbeatInterval: Schema.number().role('ms').default(30000),
-    idleOffset: Schema.number().default(1),
+    idleOffset: Schema.natural().default(1),
   })
 }
 

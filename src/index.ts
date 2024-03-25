@@ -384,11 +384,11 @@ export namespace Tcpt {
    }
 
   export const Config: Schema<Config> = Schema.object({
-    eloOrigin: Schema.number().default(2000),
+    eloOrigin: Schema.natural().default(2000),
     lobby: TziakchaLobby.Config,
     fontFamily: Schema.string().default('Microsoft YaHei, sans-serif'),
-    maxAgainstsTop: Schema.number().default(20),
-    maxAgainstsBottom: Schema.number().default(10),
+    maxAgainstsTop: Schema.natural().default(20),
+    maxAgainstsBottom: Schema.natural().default(10),
   })
 }
 
