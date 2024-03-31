@@ -254,7 +254,7 @@ export class Tcpt {
       p((x.r1 + 2 * x.r2 + 3 * x.r3 + 4 * x.r4) / x.cnt, 'decimal'), p(x.rs / x.cnt, 'decimal'), `${x.r1}/${x.r2}/${x.r3}/${x.r4}`,
     ].map(x => x.toString()))
 
-    const table = new CanvasTable(this.ctx.canvas.createCanvas(600, (title ? 72 : 48) + 18.5 * data.length) as any, {
+    const table = new CanvasTable(await this.ctx.canvas.createCanvas(600, (title ? 72 : 48) + 18.5 * data.length) as any, {
       columns: headers.map(x => ({ title: x })),
       data,
       options: {
