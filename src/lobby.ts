@@ -82,7 +82,7 @@ export class TziakchaLobby {
 
   connect() {
     try { this.#ws?.close() } catch {}
-    this.#ws = this.ctx.http.ws('ws://www.tziakcha.xyz:5333/ws')
+    this.#ws = this.ctx.http.ws(this.config.endpoint)
     this.#ws.on('message', this.#receive.bind(this))
     this.#ws.on('error', (e) => {
       if (!e.message.includes('invalid status code')) logger.warn(e)
@@ -258,6 +258,7 @@ export namespace TziakchaLobby {
   export const using = ['mahjong']
 
   export interface Config {
+    endpoint: string
     username?: string
     password?: string
     reconnectTimes: number
@@ -267,6 +268,7 @@ export namespace TziakchaLobby {
   }
 
   export const Config: Schema<Config> = Schema.object({
+    endpoint: Schema.string().default('wss://www.tziakcha.xyz:5334/ws'),
     username: Schema.string().required(false),
     password: Schema.string().role('secret').required(false),
     reconnectTimes: Schema.natural().default(10),
