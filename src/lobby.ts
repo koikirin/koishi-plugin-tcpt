@@ -1,7 +1,6 @@
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { } from '@cordisjs/timer'
 import { Context, Dict, Disposable, Logger, Schema } from 'koishi'
-import { WebSocket } from 'ws'
 import { formatTimeLimits } from './utils'
 
 const logger = new Logger('tcpt.lobby')
@@ -53,16 +52,20 @@ export class TziakchaLobby {
   #lastHeartbeat: number = 0
 
   constructor(private ctx: Context, private config: TziakchaLobby.Config) {
-    ctx.command('tcpt/tclobby')
+    ctx.command('tcpt/tclobby [pattern:string]')
       .option('wait', '-w')
       .option('play', '-p')
+      .option('bind', '-b')
       .alias('tcwait', { options: { wait: true, play: false } })
       .alias('tcplay', { options: { wait: false, play: true } })
-      .action(({ session, options }) => {
+      .userFields(['tclobby/bind'])
+      .action(({ session, options }, pattern) => {
+        if (options.bind) session.user['tclobby/bind'] = pattern ?? ''
+        pattern ||= session.user['tclobby/bind']
         const wait = `- ${session.text('.wait')}[${this.stats.f}/${this.stats.w}]：\n`
-          + Object.values(this.rooms).filter(x => !x.start_time).map(formatWaitingRoom).join('\n')
+          + Object.values(this.rooms).filter(x => (!pattern || x.title.includes(pattern)) && !x.start_time).map(formatWaitingRoom).join('\n')
         const play = `- ${session.text('.play')}[${(this.stats.p + this.stats.o) / 4}]：\n`
-          + Object.values(this.rooms).filter(x => x.start_time).map(formatPlayingRoom).join('\n')
+          + Object.values(this.rooms).filter(x => (!pattern || x.title.includes(pattern)) && x.start_time).map(formatPlayingRoom).join('\n')
         if (options.wait && options.play) return wait + '\n' + play
         if (options.wait) return wait
         else if (options.play) return play
@@ -83,12 +86,12 @@ export class TziakchaLobby {
   connect() {
     try { this.#ws?.close() } catch {}
     this.#ws = this.ctx.http.ws(this.config.endpoint)
-    this.#ws.on('message', this.#receive.bind(this))
-    this.#ws.on('error', (e) => {
+    this.#ws.addEventListener('message', this.#receive.bind(this))
+    this.#ws.addEventListener('error', (e: ErrorEvent) => {
       if (!e.message.includes('invalid status code')) logger.warn(e)
       try { this.#ws?.close() } finally { this.#ws = null }
     })
-    this.#ws.on('close', () => {
+    this.#ws.addEventListener('close', () => {
       logger.info('Disconnect')
       try { this.#ws?.close() } finally { this.#ws = null }
       this.#connectRetries += 1
@@ -100,7 +103,7 @@ export class TziakchaLobby {
         this.ctx.setTimeout(this.connect.bind(this), this.config.reconnectInterval)
       }
     })
-    this.#ws.on('open', async () => {
+    this.#ws.addEventListener('open', async () => {
       this.#ws.send(JSON.stringify({
         'm': 1,
         'p': this.config.password,
@@ -109,18 +112,17 @@ export class TziakchaLobby {
         'u': this.config.username,
         'z': '',
       }))
-
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 300))
 
       this.#ws.send(JSON.stringify({
         m: 1,
         r: 2,
-      }), (e) => {
-        if (e) return
-        this.#connectRetries = 0
-        this.rooms = {}
-        logger.info('Connected to server')
-      })
+      }))
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      this.#connectRetries = 0
+      this.rooms = {}
+      logger.info('Connected to server')
     })
 
     this.#heartbeat?.()
@@ -223,7 +225,8 @@ export class TziakchaLobby {
     }
   }
 
-  #receive(data: any) {
+  #receive({ data }: MessageEvent) {
+    if (typeof data !== 'string') return
     const packet = JSON.parse(data)
     const op = packet.m
     if (packet.s?.f !== undefined) this.stats = packet.s

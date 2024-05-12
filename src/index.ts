@@ -8,6 +8,7 @@ import { TziakchaLobby } from './lobby'
 declare module 'koishi' {
   interface User {
     'tcpt/bind': string
+    'tclobby/bind': string
   }
 }
 
@@ -17,6 +18,7 @@ export class Tcpt {
 
     ctx.model.extend('user', {
       'tcpt/bind': 'string',
+      'tclobby/bind': 'string',
     })
 
     ctx.command('tcpt [username:rawtext]')
