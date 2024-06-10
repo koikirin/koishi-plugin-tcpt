@@ -91,7 +91,7 @@ export class Tcpt {
   }
 
   async queryId(name: string) {
-    const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.n': name }).sort('st', 'descending').limit(1)
+    const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.n': name }).sort({ st: -1 }).limit(1)
     const doc = await cursor.next()
     if (doc) for (const u of doc.u) if (u.n === name) return u.i
   }
@@ -99,7 +99,7 @@ export class Tcpt {
   async query(session: Session, id: number, filters: object = {}) {
     let name: string
 
-    const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.i': id, ...filters }).sort('st', 'descending')
+    const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches').find({ 'u.i': id, ...filters }).sort({ st: -1 })
 
     const elo: [number?, number?, number?] = [undefined, undefined, undefined]
     const stats = {
@@ -211,7 +211,7 @@ export class Tcpt {
   } = {}): Promise<Tcpt.Against[]> {
     const cursor = this.ctx.mahjong.database.db('tziakcha').collection('matches')
       .find({ 'u.i': options.target ? { $all: [id, options.target] } : id, ...filters })
-      .sort('st', 'descending')
+      .sort({ st: -1 })
     const rs: Dict<Tcpt.Against> = Object.create(null)
 
     for await (let doc of cursor) {
