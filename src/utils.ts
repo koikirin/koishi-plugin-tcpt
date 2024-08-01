@@ -95,9 +95,9 @@ export function getEloClass(doc: any) {
 
 export const EloLabels = ['快速', '常规', '经典']
 
-export function fillDocumentRounds(doc: any): any {
+export function fillDocumentRounds(doc: any, normalized = false): any {
   const rounds = []
-  const bs = doc.g.b === undefined ? 8 : doc.g.b
+  const bs = (normalized || doc.g.b === undefined) ? 8 : doc.g.b
   const fa = doc.g.fa
   for (const rd of doc.rd) {
     rounds.push({

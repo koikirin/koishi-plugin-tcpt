@@ -157,7 +157,7 @@ export class Tcpt {
           stats.btsumo += 1
         }
         if (rp[idx] < 0) stats.cuohu += 1
-        stats.rps += rp[idx]
+        else stats.rps += rp[idx]
       }
     }
 
