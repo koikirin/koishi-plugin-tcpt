@@ -104,6 +104,9 @@ export class TziakchaLobby {
       }
     })
     this.#ws.addEventListener('open', async () => {
+      this.#connectRetries = 0
+      this.rooms = {}
+
       this.#ws.send(JSON.stringify({
         'm': 1,
         'p': this.config.password,
@@ -120,8 +123,6 @@ export class TziakchaLobby {
       }))
       await new Promise(resolve => setTimeout(resolve, 300))
 
-      this.#connectRetries = 0
-      this.rooms = {}
       logger.info('Connected to server')
     })
 
