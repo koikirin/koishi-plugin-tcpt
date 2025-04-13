@@ -1,7 +1,7 @@
 {
   "name": "@hieuzest/koishi-plugin-tcpt",
   "description": "Query Tziakcha PT",
-  "version": "1.7.4",
+  "version": "1.8.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -24,5 +24,11 @@
   "peerDependencies": {
     "@hieuzest/canvas-table": "^0.5.0",
     "koishi": "^4.17.8"
+  },
+  "devDependencies": {
+    "@types/pako": "^2.0.3"
+  },
+  "dependencies": {
+    "pako": "^2.1.0"
   }
 }

@@ -108,3 +108,54 @@ export function fillDocumentRounds(doc: any, normalized = false): any {
   doc.rounds = rounds
   return doc
 }
+
+export function solveWaitingTiles(hand: string) {
+  const tiles = hand.split('').map(Number)
+  const tileCounts = new Array(10).fill(0)
+  for (const tile of tiles) {
+    tileCounts[tile]++
+  }
+  const result = []
+
+  function isComplete(tileCounts: number[], state: number = 0) {
+    if (state === 4) {
+      for (let i = 1; i <= 9; i++) {
+        if (tileCounts[i] === 2) {
+          return true
+        }
+      }
+    }
+
+    // try sequence
+    for (let i = 1; i <= 7; i++) {
+      if (tileCounts[i] > 0 && tileCounts[i + 1] > 0 && tileCounts[i + 2] > 0) {
+        tileCounts[i]--
+        tileCounts[i + 1]--
+        tileCounts[i + 2]--
+        if (isComplete(tileCounts, state + 1)) return true
+        tileCounts[i]++
+        tileCounts[i + 1]++
+        tileCounts[i + 2]++
+      }
+    }
+
+    // try triplet
+    for (let i = 1; i <= 9; i++) {
+      if (tileCounts[i] >= 3) {
+        tileCounts[i] -= 3
+        if (isComplete(tileCounts, state + 1)) return true
+        tileCounts[i] += 3
+      }
+    }
+  }
+
+  for (let i = 1; i <= 9; i++) {
+    if (tileCounts[i] < 4) {
+      tileCounts[i]++
+      if (isComplete(tileCounts.slice())) result.push(i)
+      tileCounts[i]--
+    }
+  }
+
+  return result.join('')
+}

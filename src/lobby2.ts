@@ -1,7 +1,7 @@
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { } from '@cordisjs/timer'
 import { Context, Dict, Disposable, h, Logger, Schema } from 'koishi'
-import { formatTimeLimits } from './utils'
+import { formatTimeLimits, solveWaitingTiles } from './utils'
 import { inflate } from 'pako'
 
 const logger = new Logger('tcpt.lobby')
@@ -53,7 +53,7 @@ export class TziakchaLobby {
   #lastHeartbeat: number = 0
 
   constructor(private ctx: Context, private config: TziakchaLobby.Config) {
-    ctx.command('tcpt/tclobby1 [pattern:string]')
+    ctx.command('tcpt/tclobby2 [pattern:string]')
       .option('wait', '-w')
       .option('play', '-p')
       .option('bind', '-b')
@@ -108,19 +108,8 @@ export class TziakchaLobby {
 
       this.#ws.send(JSON.stringify({
         'm': 1,
-        'p': this.config.password,
-        'r': 9,
-        's': '',
-        'u': this.config.username,
-        'z': '',
+        'r': 10,
       }))
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      this.#ws.send(JSON.stringify({
-        m: 1,
-        r: 2,
-      }))
-      await new Promise(resolve => setTimeout(resolve, 300))
 
       logger.info('Connected to server')
     })
@@ -142,6 +131,24 @@ export class TziakchaLobby {
         } catch {}
       }
     }, this.config.heartbeatInterval)
+  }
+
+  async #login(question: string) {
+    this.#ws.send(JSON.stringify({
+      'm': 1,
+      'p': this.config.password,
+      'r': 9,
+      's': solveWaitingTiles(question),
+      'u': this.config.username,
+      'z': question,
+    }))
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    this.#ws.send(JSON.stringify({
+      m: 1,
+      r: 2,
+    }))
   }
 
   packRoom(data: any) {
@@ -248,6 +255,8 @@ export class TziakchaLobby {
       this.dismissRoom(packet)
     } else if (op === 1 && packet.r === 8) {
       // Stats update
+    } else if (op === 1 && packet.r === 10) {
+      this.#login(packet.z)
     } else if (op === 1 && packet.r === 13) {
       if (packet.p === 1) this.startRoom(packet)
       else this.updateRoom(packet)
@@ -271,7 +280,7 @@ export namespace TziakchaLobby {
   }
 
   export const Config: Schema<Config> = Schema.object({
-    endpoint: Schema.string().default('wss://www.tziakcha.xyz:5334/ws'),
+    endpoint: Schema.string().default('wss://tziakcha.net:5334/ws'),
     username: Schema.string().required(false),
     password: Schema.string().role('secret').required(false),
     reconnectTimes: Schema.natural().default(10),

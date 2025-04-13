@@ -4,6 +4,7 @@ import { } from '@koishijs/canvas'
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { fillDocumentRounds, getEloClass } from './utils'
 import { TziakchaLobby } from './lobby'
+import { TziakchaLobby as TziakchaLobby2 } from './lobby2'
 
 declare module 'koishi' {
   interface User {
@@ -87,7 +88,40 @@ export class Tcpt {
         return await this.formatAgainst(stats, `${username} 的同桌统计`)
       })
 
-    ctx.plugin(TziakchaLobby, config)
+    ctx.plugin(TziakchaLobby, config.lobby)
+    ctx.plugin(TziakchaLobby2, config.lobby2)
+
+    ctx.command('tcpt/tclobby [pattern:string]')
+      .option('wait', '-w')
+      .option('play', '-p')
+      .option('bind', '-b')
+      .alias('tcwait', { options: { wait: true, play: false } })
+      .alias('tcplay', { options: { wait: false, play: true } })
+      .userFields(['tclobby/bind'])
+      .action(async ({ session, options }, pattern) => {
+        const msg = []
+        msg.push('【体验服】')
+        msg.push(await session.execute({
+          name: 'tclobby2',
+          options: {
+            wait: options.wait,
+            play: options.play,
+            bind: options.bind,
+          },
+          args: [pattern],
+        }, true))
+        msg.push('【怀旧服】')
+        msg.push(await session.execute({
+          name: 'tclobby1',
+          options: {
+            wait: options.wait,
+            play: options.play,
+            bind: options.bind,
+          },
+          args: [pattern],
+        }, true))
+        return msg.join('\n')
+      })
   }
 
   async queryId(name: string) {
@@ -380,6 +414,7 @@ export namespace Tcpt {
   export interface Config {
     eloOrigin: number
     lobby: TziakchaLobby.Config
+    lobby2: TziakchaLobby2.Config
     fontFamily: string
     maxAgainstsTop: number
     maxAgainstsBottom: number
@@ -388,6 +423,7 @@ export namespace Tcpt {
   export const Config: Schema<Config> = Schema.object({
     eloOrigin: Schema.natural().default(2000),
     lobby: TziakchaLobby.Config,
+    lobby2: TziakchaLobby2.Config,
     fontFamily: Schema.string().default('Microsoft YaHei, sans-serif'),
     maxAgainstsTop: Schema.natural().default(20),
     maxAgainstsBottom: Schema.natural().default(10),
