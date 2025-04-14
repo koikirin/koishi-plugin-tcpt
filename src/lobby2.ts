@@ -1,7 +1,7 @@
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { } from '@cordisjs/timer'
 import { Context, Dict, Disposable, h, Logger, Schema } from 'koishi'
-import { formatTimeLimits, solveWaitingTiles } from './utils'
+import { fmtTl, solveWaitingTiles } from './utils'
 import { inflate } from 'pako'
 
 const logger = new Logger('tcpt.lobby')
@@ -32,6 +32,10 @@ interface Room {
   g: any
   password: boolean
   start_time?: number
+}
+
+export function formatTimeLimits(doc: any, limits: boolean = false) {
+  return fmtTl(doc.g.r0, doc.g.r1, doc.g.e, limits ? doc.g.l : 0)
 }
 
 function formatWaitingRoom(room: Room) {

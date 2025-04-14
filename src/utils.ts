@@ -55,7 +55,7 @@ function calcRP(v, f) {
   return a
 }
 
-function fmtTl(p, s, e, l) {
+export function fmtTl(p, s, e, l) {
   let r = '' + p
   if (p !== s) { r += '/'; r += s }
   if (e || p === s) { r += '+'; r += e }
@@ -63,12 +63,8 @@ function fmtTl(p, s, e, l) {
   return r
 }
 
-export function formatTimeLimits(doc: any, limits: boolean = false) {
-  return fmtTl(doc.g.r30, doc.g.r12, doc.g.e, limits ? doc.g.l : 0)
-}
-
 function _getEloClass(doc: any) {
-  const [p, e] = [doc.g.r30, doc.g.e]
+  const [p, e] = [doc.g.r30 ?? doc.g.r0, doc.g.e]
   if (p <= 3) {
     if (e <= 5) return 0
     else if (e <= 10) return 1
@@ -106,6 +102,16 @@ export function fillDocumentRounds(doc: any, normalized = false): any {
     })
   }
   doc.rounds = rounds
+  return doc
+}
+
+export function fillDocumentRounds2(doc: any, normalized = false): any {
+  const bs = (normalized || doc.g.b === undefined) ? 8 : doc.g.b
+  const z = doc.g.z
+  for (const rd of doc.records) {
+    rd.rs = calcRS(rd.s, bs)
+    rd.rp = calcRP(rd.s, z)
+  }
   return doc
 }
 
