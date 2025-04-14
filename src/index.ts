@@ -9,6 +9,8 @@ import { TziakchaLobby as TziakchaLobby2 } from './lobby2'
 declare module 'koishi' {
   interface User {
     'tcpt/bind': string
+    'tcpt1/bind': string
+    'tcpt2/bind': string
     'tclobby/bind': string
   }
 }
@@ -22,6 +24,8 @@ export class Tcpt {
 
     ctx.model.extend('user', {
       'tcpt/bind': 'string',
+      'tcpt1/bind': 'string',
+      'tcpt2/bind': 'string',
       'tclobby/bind': 'string',
     })
 
@@ -29,7 +33,7 @@ export class Tcpt {
       .option('all', '-a')
       .option('common', '-c')
       .option('bind', '-b')
-      .userFields(['tcpt/bind'])
+      .userFields(['tcpt/bind', 'tcpt1/bind', 'tcpt2/bind'])
       .action(async ({ session, options, args }, username) => {
         if (options.bind) session.user['tcpt/bind'] = username ?? ''
         username ||= session.user['tcpt/bind']
@@ -80,10 +84,10 @@ export class Tcpt {
       .option('all', '-a')
       .option('common', '-c')
       .option('bind', '-b')
-      .userFields(['tcpt/bind'])
+      .userFields(['tcpt/bind', 'tcpt1/bind'])
       .action(async ({ session, options }, username) => {
-        if (options.bind) session.user['tcpt/bind'] = username ?? ''
-        username ||= session.user['tcpt/bind']
+        if (options.bind) session.user['tcpt1/bind'] = username ?? ''
+        username ||= session.user['tcpt1/bind'] || session.user['tcpt/bind']
         if (!username) return options.bind ? '' : session.execute('help tcpt')
         let filters: object = {
           'g.n': 16,
@@ -103,6 +107,36 @@ export class Tcpt {
           extra = session.text('.extra-common')
         }
         const res = await this.query(session, username.startsWith('$') ? +username.slice(1) : await this.queryId(username), filters)
+        return res ? res + (extra ? '\n' + extra : '') : session.text('.failed')
+      })
+
+    ctx.command('tcpt/tcpt2 [username:rawtext]')
+      .option('all', '-a')
+      .option('common', '-c')
+      .option('bind', '-b')
+      .userFields(['tcpt/bind', 'tcpt2/bind'])
+      .action(async ({ session, options }, username) => {
+        if (options.bind) session.user['tcpt2/bind'] = username ?? ''
+        username ||= session.user['tcpt2/bind'] || session.user['tcpt/bind']
+        if (!username) return options.bind ? '' : session.execute('help tcpt2')
+        let filters: object = {
+          'periods': 16,
+          'g.l': 8,
+          'g.b': 8,
+          // 'rd.15': { $exists: true },
+        }
+        let extra = session.text('.extra-default')
+        if (options.all) {
+          filters = {}
+          extra = session.text('.extra-all')
+        } else if (options.common) {
+          filters = {
+            'g.l': 8,
+            'g.b': 8,
+          }
+          extra = session.text('.extra-common')
+        }
+        const res = await this.query2(session, username.startsWith('$') ? username.slice(1) : await this.queryId2(username), filters)
         return res ? res + (extra ? '\n' + extra : '') : session.text('.failed')
       })
 
@@ -148,36 +182,6 @@ export class Tcpt {
           stats = [...stats.slice(0, config.maxAgainstsTop), ...stats.slice(-config.maxAgainstsBottom)]
         }
         return await this.formatAgainst(stats, `${username} 的同桌统计`)
-      })
-
-    ctx.command('tcpt/tcpt2 [username:rawtext]')
-      .option('all', '-a')
-      .option('common', '-c')
-      .option('bind', '-b')
-      .userFields(['tcpt/bind'])
-      .action(async ({ session, options }, username) => {
-        if (options.bind) session.user['tcpt/bind'] = username ?? ''
-        username ||= session.user['tcpt/bind']
-        if (!username) return options.bind ? '' : session.execute('help tcpt2')
-        let filters: object = {
-          'periods': 16,
-          'g.l': 8,
-          'g.b': 8,
-          // 'rd.15': { $exists: true },
-        }
-        let extra = session.text('.extra-default')
-        if (options.all) {
-          filters = {}
-          extra = session.text('.extra-all')
-        } else if (options.common) {
-          filters = {
-            'g.l': 8,
-            'g.b': 8,
-          }
-          extra = session.text('.extra-common')
-        }
-        const res = await this.query2(session, username.startsWith('$') ? username.slice(1) : await this.queryId2(username), filters)
-        return res ? res + (extra ? '\n' + extra : '') : session.text('.failed')
       })
   }
 
