@@ -296,6 +296,7 @@ export class Tcpt {
       btsumo: 0,
       cuohu: 0,
       std: 0,
+      norms: {},
       trend: '',
     }
 
@@ -315,6 +316,7 @@ export class Tcpt {
           const r = doc.players.filter(p => p.s > u.s).length + 1
           stats[`r${r}`] += 1
           stats[`r${r}s`] += u.s
+          stats.norms[u.m] = (stats.norms[u.m] || 0) + 1
           stats.std += u.m
           stats.trend += `${r}`
         }
@@ -345,7 +347,9 @@ export class Tcpt {
     }
 
     const scores = stats.r1s + stats.r2s + stats.r3s + stats.r4s - stats.rps
-    return session.text('.output', { p, config: this.config, elo, name, scores, stats })
+    const norms = (stats.norms[36] || 0) * 48 + (stats.norms[27] || 0) * 36 + (stats.norms[20] || 0) * 28 + (stats.norms[18] || 0) * 24
+      + (stats.norms[15] || 0) * 21 + (stats.norms[12] || 0) * 18 + (stats.norms[8] || 0) * 12 + (stats.norms[6] || 0) * 12 + (stats.norms[3] || 0) * 6
+    return session.text('.output', { p, config: this.config, elo, name, scores, norms, stats })
   }
 
   async queryNames(id: number) {

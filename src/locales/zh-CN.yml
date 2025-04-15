@@ -1,4 +1,9 @@
 commands:
+  tcpt:
+    description: 查询雀渣PT
+    usage: "*平分与摆设算法不同，未作标准化处理，仅供参考"
+    options:
+      bind: 绑定/清除当前用户
   tcpt1:
     description: 查询雀渣PT
     usage: "*平分与摆设算法不同，未作标准化处理，仅供参考"
@@ -30,13 +35,19 @@ commands:
       output: |
         {name} 合计{stats.cnt}战 [{stats.r1}/{stats.r2}/{stats.r3}/{stats.r4}]
         ELO [{elo.map(x => x ? String(x) : '?').join('/')}]
-        和率{p(stats.hule / stats.cntr)} 铳率{p(stats.chong / stats.cntr)} 平分{p(scores / stats.cntr, 'decimal')} 平标准分{p(stats.std / stats.cnt, 'decimal')}
+        和率{p(stats.hule / stats.cntr)} 铳率{p(stats.chong / stats.cntr)} 平分{p(scores / stats.cntr, 'decimal')} 平标准分{p(norms / stats.cnt / 12, 'decimal')}
         自摸率{p(stats.tsumo / stats.hule)} 被摸率{p(stats.btsumo / stats.cntr)} 错和率{p(stats.cuohu / stats.cntr)}
         最近战绩 [{stats.trend.slice(0, 10).split('').reverse().join('')}]
   tcnames:
     description: 查询雀渣曾用名
     messages:
       failed: 查询失败
+  tcnames2:
+    description: 查询雀渣曾用名
+    messages:
+      failed: 查询失败
+  tclobby:
+    description: 查看大厅
   tclobby1:
     description: 查看大厅
     messages:
