@@ -1,6 +1,6 @@
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { } from '@cordisjs/timer'
-import { Context, Dict, Disposable, h, Logger, Schema } from 'koishi'
+import { Context, Dict, Disposable, h, Logger, Schema, Time } from 'koishi'
 import { fmtTl, solveWaitingTiles } from './utils'
 import { inflate } from 'pako'
 
@@ -97,14 +97,12 @@ export class TziakchaLobby {
     this.#ws.addEventListener('close', () => {
       logger.info('Disconnect')
       try { this.#ws?.close() } finally { this.#ws = null }
-      this.#connectRetries += 1
-
-      if (this.#connectRetries > this.config.reconnectTimes) {
-        logger.warn('Exceed max retries')
-      } else if (!this.closed) {
-        logger.info(`Connection closed. will reconnect... (${this.#connectRetries})`)
-        this.ctx.setTimeout(this.connect.bind(this), this.config.reconnectInterval)
+      if (!this.closed) {
+        const interval = this.config.reconnectIntervals[this.#connectRetries] ?? this.config.reconnectIntervals.at(-1)
+        logger.info(`Connection closed. will reconnect after ${interval}ms ... (${this.#connectRetries})`)
+        this.ctx.setTimeout(this.connect.bind(this), interval)
       }
+      this.#connectRetries += 1
     })
     this.#ws.addEventListener('open', async () => {
       this.#connectRetries = 0
@@ -265,7 +263,7 @@ export class TziakchaLobby {
       if (packet.p === 1) this.startRoom(packet)
       else this.updateRoom(packet)
     } else {
-      logger.debug(packet)
+      logger.warn(packet)
     }
   }
 }
@@ -277,8 +275,7 @@ export namespace TziakchaLobby {
     endpoint: string
     username?: string
     password?: string
-    reconnectTimes: number
-    reconnectInterval: number
+    reconnectIntervals: number[]
     heartbeatInterval: number
     idleOffset: number
   }
@@ -287,8 +284,10 @@ export namespace TziakchaLobby {
     endpoint: Schema.string().default('wss://tziakcha.net:5334/ws'),
     username: Schema.string().required(false),
     password: Schema.string().role('secret').required(false),
-    reconnectTimes: Schema.natural().default(10),
-    reconnectInterval: Schema.number().role('ms').default(60000),
+    reconnectIntervals: Schema.array(Schema.number().role('ms')).default([
+      Time.second * 5, Time.second * 10, Time.second * 30,
+      Time.minute, Time.minute * 3, Time.minute * 5, Time.minute * 10,
+    ]),
     heartbeatInterval: Schema.number().role('ms').default(30000),
     idleOffset: Schema.natural().default(1),
   })

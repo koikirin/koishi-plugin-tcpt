@@ -3,7 +3,7 @@ import { CanvasTable } from '@hieuzest/canvas-table'
 import { } from '@koishijs/canvas'
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { fillDocumentRounds, fillDocumentRounds2, getEloClass } from './utils'
-import { TziakchaLobby } from './lobby'
+// import { TziakchaLobby } from './lobby'
 import { TziakchaLobby as TziakchaLobby2 } from './lobby2'
 
 declare module 'koishi' {
@@ -19,7 +19,7 @@ export class Tcpt {
   constructor(private ctx: Context, private config: Tcpt.Config) {
     ctx.i18n.define('zh-CN', require('./locales/zh-CN'))
 
-    ctx.plugin(TziakchaLobby, config.lobby)
+    // ctx.plugin(TziakchaLobby, config.lobby)
     ctx.plugin(TziakchaLobby2, config.lobby2)
 
     ctx.model.extend('user', {
@@ -38,21 +38,11 @@ export class Tcpt {
         if (options.bind) session.user['tcpt/bind'] = username ?? ''
         username ||= session.user['tcpt/bind']
         if (!username) return options.bind ? '' : session.execute('help tcpt')
-        const msg = []
-        msg.push('【体验服】')
-        msg.push(await session.execute({
+        await session.execute({
           name: 'tcpt2',
           options,
           args,
-        }, true))
-        msg.push('')
-        msg.push('【怀旧服】')
-        msg.push(await session.execute({
-          name: 'tcpt1',
-          options,
-          args,
-        }, true))
-        return msg.join('\n')
+        })
       })
 
     ctx.command('tcpt/tclobby [pattern:string]')
@@ -63,21 +53,11 @@ export class Tcpt {
       .alias('tcplay', { options: { wait: false, play: true } })
       .userFields(['tclobby/bind'])
       .action(async ({ session, options, args }) => {
-        const msg = []
-        msg.push('【体验服】')
-        msg.push(await session.execute({
+        await session.execute({
           name: 'tclobby2',
           options,
           args,
-        }, true))
-        msg.push('')
-        msg.push('【怀旧服】')
-        msg.push(await session.execute({
-          name: 'tclobby1',
-          options,
-          args,
-        }, true))
-        return msg.join('\n')
+        })
       })
 
     ctx.command('tcpt/tcpt1 [username:rawtext]')
@@ -141,14 +121,6 @@ export class Tcpt {
       })
 
     ctx.command('tcpt/tcnames <username:rawtext>')
-      .action(async ({ session }, username) => {
-        if (!username) return session.execute('help tcnames')
-        const names = await this.queryNames(await this.queryId(username))
-        if (names && Object.values(names).length) return Object.entries(names).sort(([_1, x], [_2, y]) => y - x).map(([k, v], _) => `[${v}] ${k}`).join('\n')
-        return session.text('.failed')
-      })
-
-    ctx.command('tcpt/tcnames2 <username:rawtext>')
       .action(async ({ session }, username) => {
         if (!username) return session.execute('help tcnames')
         const names = await this.queryNames2(await this.queryId2(username))
@@ -636,7 +608,7 @@ export namespace Tcpt {
 
   export interface Config {
     eloOrigin: number
-    lobby: TziakchaLobby.Config
+    // lobby: TziakchaLobby.Config
     lobby2: TziakchaLobby2.Config
     fontFamily: string
     maxAgainstsTop: number
@@ -645,7 +617,7 @@ export namespace Tcpt {
 
   export const Config: Schema<Config> = Schema.object({
     eloOrigin: Schema.natural().default(2000),
-    lobby: TziakchaLobby.Config,
+    // lobby: TziakchaLobby.Config,
     lobby2: TziakchaLobby2.Config,
     fontFamily: Schema.string().default('Microsoft YaHei, sans-serif'),
     maxAgainstsTop: Schema.natural().default(20),

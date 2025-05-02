@@ -42,17 +42,8 @@ commands:
     description: 查询雀渣曾用名
     messages:
       failed: 查询失败
-  tcnames2:
-    description: 查询雀渣曾用名
-    messages:
-      failed: 查询失败
   tclobby:
     description: 查看大厅
-  tclobby1:
-    description: 查看大厅
-    messages:
-      wait: 大厅
-      play: 对局
   tclobby2:
     description: 查看大厅
     messages:
