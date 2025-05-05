@@ -73,6 +73,7 @@ export class Tcpt {
           'g.n': 16,
           'g.l': 8,
           'g.b': 8,
+          'g.i': 0,
           'rd.15': { $exists: true },
         }
         let extra = session.text('.extra-default')
@@ -83,6 +84,7 @@ export class Tcpt {
           filters = {
             'g.l': 8,
             'g.b': 8,
+            'g.i': 0,
           }
           extra = session.text('.extra-common')
         }
@@ -103,6 +105,7 @@ export class Tcpt {
           'periods': 16,
           'g.l': 8,
           'g.b': 8,
+          'initial': 0,
           // 'rd.15': { $exists: true },
         }
         let extra = session.text('.extra-default')
@@ -113,6 +116,7 @@ export class Tcpt {
           filters = {
             'g.l': 8,
             'g.b': 8,
+            'initial': 0,
           }
           extra = session.text('.extra-common')
         }
