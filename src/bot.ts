@@ -1,6 +1,6 @@
 import { } from '@cordisjs/timer'
 import { mkdir, writeFile } from 'fs/promises'
-import { Context, Disposable, isNullable, Logger, noop, Schema, Time } from 'koishi'
+import { Context, Disposable, isNullable, Logger, Schema, sleep, Time } from 'koishi'
 import { solveWaitingTiles } from './utils'
 import { inflate } from 'pako'
 import { resolve } from 'path'
@@ -96,17 +96,38 @@ export class TziakchaBot {
     this.#wsBot.addEventListener('open', () => {
       this.logger.info('Connected to agent')
     })
-    this.#wsBot.addEventListener('message', (e: MessageEvent) => {
-      this.logger.debug('Receive from agent: ', e.data)
+    this.#wsBot.addEventListener('message', async (e: MessageEvent) => {
+      const packet = JSON.parse(e.data)
+      this.logger.debug('Receive from agent: ', packet)
       this.#log({
-        ...JSON.parse(e.data),
+        ...packet,
         type: 'send',
       })
+      if (packet.type === 'error') {
+        this.logger.warn('Agent error:', packet)
+        return
+      }
+      await sleep(this.config.delay)
       this.#ws.send(e.data)
     })
     this.#wsBot.addEventListener('error', (e: ErrorEvent) => {
       this.logger.warn('Agent error:', e.message)
     })
+    this.#wsBot.addEventListener('close', () => {
+      this.logger.info('Disconnect')
+      try { this.#wsBot?.close() } finally { this.#ws = null }
+      if (!this.closed) {
+        const interval = this.config.reconnectIntervals[this.#connectRetries] ?? this.config.reconnectIntervals.at(-1)
+        this.logger.info(`Connection closed. will reconnect after ${interval}ms ... (${this.#connectRetries})`)
+        this.ctx.setTimeout(this.#connectBot.bind(this), interval)
+      }
+      this.#connectRetries += 1
+    })
+  }
+
+  async kill() {
+    try { this.#ws?.close() } catch {}
+    try { this.#wsBot?.close() } catch {}
   }
 
   async #log(message: any) {
@@ -195,11 +216,15 @@ export class TziakchaBot {
     } else if (op === 2) {
       // game packets
       await this.#process(packet)
-      if (data.r === 17) this.#flush()
+      if (data.r === 17) {
+        this.status = 'idle'
+        this.#flush()
+      }
     }
   }
 
   async #process(packet) {
+    this.status = 'play'
     this.logger.debug('Send to agent:', packet)
     this.#log({
       ...packet,
@@ -226,7 +251,7 @@ export class TziakchaBotService {
 
     this.bots = this.config.bots.map(botConfig => new TziakchaBot(ctx, this.config, botConfig))
 
-    ctx.command('tcbot').action(noop)
+    ctx.command('tcbot')
 
     ctx.command('tcbot.status').action(() => {
       return this.bots.map(bot => `${bot.config.name} ${bot.status === 'idle' ? '空闲中✅' : bot.status === 'wait' ? '准备中⏳' : '对局中❌'}`).join('\n')
@@ -235,7 +260,7 @@ export class TziakchaBotService {
     ctx.command('tcbot.join <roomPattern:string>')
       .option('password', '-p <password:string>')
       .action(async ({ session, options }, roomPattern) => {
-        if (!roomPattern) return session.text('.no-room-pattern')
+        if (!roomPattern) return session.execute('help tcbot.join')
         const bot = this.bots.find(bot => bot.status === 'idle')
         if (!bot) return session.text('.no-available')
         const candidates = Object.values(ctx.tclobby.rooms).filter((room) => !room.start_time && room.title.match(roomPattern))
@@ -265,6 +290,21 @@ export class TziakchaBotService {
           return session.text('.success')
         }
       })
+
+    ctx.command('tcbot.reset')
+      .action(async ({ session }) => {
+        for (const bot of this.bots) {
+          bot.status = 'idle'
+        }
+        return 'Success'
+      })
+
+    ctx.command('tcbot.kill')
+      .action(async ({ session }, name) => {
+        const bot = this.bots.find(bot => bot.config.name === name)
+        await bot.kill()
+        return 'Success'
+      })
   }
 }
 
@@ -290,11 +330,12 @@ export namespace TziakchaBotService {
     reconnectIntervals: number[]
     heartbeatInterval: number
     responseInterval: number
+    delay: number
   }
 
   export const Config: Schema<Config> = Schema.object({
     endpoint: Schema.string().default('wss://tziakcha.net:5334/ws'),
-    botEndpoint: Schema.string().default('ws://localhost:8089/'),
+    botEndpoint: Schema.string().default('ws://127.0.0.1:8089/'),
     bots: Schema.array(BotConfig).default([]),
     reconnectIntervals: Schema.array(Schema.number().role('ms')).default([
       Time.second * 5, Time.second * 10, Time.second * 30,
@@ -302,6 +343,7 @@ export namespace TziakchaBotService {
     ]),
     heartbeatInterval: Schema.number().role('ms').default(30000),
     responseInterval: Schema.number().role('ms').default(300),
+    delay: Schema.number().role('ms').default(1000),
   })
 }
 
