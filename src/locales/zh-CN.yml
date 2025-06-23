@@ -59,3 +59,30 @@ commands:
     usage: 省略参数时为已绑定用户
     options:
       count: 至少同桌次数（默认为10）
+  tcbot.status:
+    description: 查询机器人状态
+  tcbot.join:
+    description: 派遣机器人
+    usage: |
+      tcbot.join -p <PASSWORD> <ROOMPATTERN>
+      ROOMPATTERN: 房间名关键词
+    options:
+      password: 房间密码
+    messages:
+      no-room-pattern: 未指定房间名关键词
+      no-available: 没有可用的机器人
+      not-found: 未找到匹配的房间
+      multiple-found: 找到多个匹配的房间
+      success: |
+        机器人 {bot.config.name} 成功加入 {room.title}
+        使用 tcbot.kick {bot.config.name} 来踢出机器人
+      failed: 加入 {room.title} 失败
+  tcbot.kick:
+    description: 踢出机器人
+    usage: |
+      tcbot.kick <BOTID>
+      BOTID: 机器人ID
+    messages:
+      not-found: 未找到准备的机器人
+      success: 成功踢出机器人
+      success-all: 成功踢出所有机器人

@@ -3,7 +3,7 @@ import { CanvasTable } from '@hieuzest/canvas-table'
 import { } from '@koishijs/canvas'
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { fillDocumentRounds, fillDocumentRounds2, getEloClass } from './utils'
-// import { TziakchaLobby } from './lobby'
+import { TziakchaBotService } from './bot'
 import { TziakchaLobby as TziakchaLobby2 } from './lobby2'
 
 declare module 'koishi' {
@@ -21,6 +21,7 @@ export class Tcpt {
 
     // ctx.plugin(TziakchaLobby, config.lobby)
     ctx.plugin(TziakchaLobby2, config.lobby2)
+    ctx.plugin(TziakchaBotService, config.bot)
 
     ctx.model.extend('user', {
       'tcpt/bind': 'string',
@@ -614,6 +615,7 @@ export namespace Tcpt {
     eloOrigin: number
     // lobby: TziakchaLobby.Config
     lobby2: TziakchaLobby2.Config
+    bot: TziakchaBotService.Config
     fontFamily: string
     maxAgainstsTop: number
     maxAgainstsBottom: number
@@ -623,6 +625,7 @@ export namespace Tcpt {
     eloOrigin: Schema.natural().default(2000),
     // lobby: TziakchaLobby.Config,
     lobby2: TziakchaLobby2.Config,
+    bot: TziakchaBotService.Config,
     fontFamily: Schema.string().default('Microsoft YaHei, sans-serif'),
     maxAgainstsTop: Schema.natural().default(20),
     maxAgainstsBottom: Schema.natural().default(10),

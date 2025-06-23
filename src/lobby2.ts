@@ -1,8 +1,14 @@
 import { } from '@hieuzest/koishi-plugin-mahjong'
 import { } from '@cordisjs/timer'
-import { Context, Dict, Disposable, h, Logger, Schema, Time } from 'koishi'
+import { Context, Dict, Disposable, h, Logger, Schema, Service, Time } from 'koishi'
 import { fmtTl, solveWaitingTiles } from './utils'
 import { inflate } from 'pako'
+
+declare module 'koishi' {
+  interface Context {
+    tclobby: TziakchaLobby
+  }
+}
 
 const logger = new Logger('tcpt.lobby')
 
@@ -46,7 +52,7 @@ function formatPlayingRoom(room: Room) {
   return `[${room.rd_idx}/${room.rd_cnt}] ${room.title} (${room.players.map(x => x?.name ?? '').join(', ')})`
 }
 
-export class TziakchaLobby {
+export class TziakchaLobby extends Service {
   closed = false
   rooms: Dict<Room> = {}
   stats: Stats = { f: 0, w: 0, p: 0, o: 0 }
@@ -56,7 +62,9 @@ export class TziakchaLobby {
   #connectRetries = 0
   #lastHeartbeat: number = 0
 
-  constructor(private ctx: Context, private config: TziakchaLobby.Config) {
+  constructor(ctx: Context, public config: TziakchaLobby.Config) {
+    super(ctx, 'tclobby')
+
     ctx.command('tcpt/tclobby2 [pattern:string]')
       .option('wait', '-w')
       .option('play', '-p')
@@ -257,6 +265,8 @@ export class TziakchaLobby {
       this.dismissRoom(packet)
     } else if (op === 1 && packet.r === 8) {
       // Stats update
+    } else if (op === 1 && packet.r === 9) {
+      // Login user info
     } else if (op === 1 && packet.r === 10) {
       this.#login(packet.z)
     } else if (op === 1 && packet.r === 13) {
