@@ -10,6 +10,7 @@ export class TziakchaBot {
   logger: Logger
 
   closed = false
+  killed = false
   room: TziakchaBot.Status = {}
   status: 'idle' | 'wait' | 'play' = 'idle'
 
@@ -40,7 +41,7 @@ export class TziakchaBot {
       }
     })
 
-    ctx.on('dispose', () => this.#flush())
+    ctx.on('dispose', () => this.flush())
   }
 
   connect() {
@@ -92,6 +93,7 @@ export class TziakchaBot {
   }
 
   async #connectBot() {
+    this.killed = false
     this.#wsBot = this.ctx.http.ws(this.config.botEndpoint)
     this.#wsBot.addEventListener('open', () => {
       this.logger.info('Connected to agent')
@@ -104,6 +106,7 @@ export class TziakchaBot {
         type: 'send',
       })
       if (packet.type === 'error') {
+        this.killed = true
         this.logger.warn('Agent error:', packet)
         return
       }
@@ -134,11 +137,13 @@ export class TziakchaBot {
     this.#logs.push(message)
   }
 
-  async #flush() {
+  async flush() {
+    if (this.#logs.length === 0) return
     try {
       const logs = this.#logs.slice()
       this.#logs = []
       await writeFile(resolve(this.ctx.baseDir, 'data', 'tcbot', 'traces', `${this.config.name}-${Date.now()}.log`), JSON.stringify(logs, null, 2))
+      this.logger.info('Trace written successfully')
     } catch (e) {
       this.logger.warn('Failed to write trace:', e)
     }
@@ -216,9 +221,9 @@ export class TziakchaBot {
     } else if (op === 2) {
       // game packets
       await this.#process(packet)
-      if (data.r === 17) {
+      if (packet.r === 17) {
         this.status = 'idle'
-        this.#flush()
+        this.flush()
       }
     }
   }
@@ -253,8 +258,16 @@ export class TziakchaBotService {
 
     ctx.command('tcbot')
 
+    const fmtBotStatus = (bot: TziakchaBot) => {
+      if (bot.killed) return `已出错❌`
+      else if (bot.status === 'idle') return `空闲中✅`
+      else if (bot.status === 'wait') return `准备中⏳`
+      else if (bot.status === 'play') return `对局中❌`
+      else return `未知❓`
+    }
+
     ctx.command('tcbot.status').action(() => {
-      return this.bots.map(bot => `${bot.config.name} ${bot.status === 'idle' ? '空闲中✅' : bot.status === 'wait' ? '准备中⏳' : '对局中❌'}`).join('\n')
+      return this.bots.map(bot => `${bot.config.name} ${fmtBotStatus(bot)}`).join('\n')
     })
 
     ctx.command('tcbot.join <roomPattern:string>')
@@ -299,10 +312,16 @@ export class TziakchaBotService {
         return 'Success'
       })
 
-    ctx.command('tcbot.kill')
+    ctx.command('tcbot.kill', { authority: 3 })
       .action(async ({ session }, name) => {
         const bot = this.bots.find(bot => bot.config.name === name)
         await bot.kill()
+        return 'Success'
+      })
+
+    ctx.command('tcbot.flush', { authority: 3 })
+      .action(async ({ session }, name) => {
+        await Promise.all(this.bots.map(bot => bot.flush()))
         return 'Success'
       })
   }
