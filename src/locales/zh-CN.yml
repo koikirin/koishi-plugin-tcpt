@@ -63,7 +63,6 @@ commands:
     description: 查询机器人状态
   tcbot.join:
     description: 派遣机器人
-    usage: tcbot.join -p <PASSWORD> <ROOMPATTERN>
     options:
       password: 房间密码
     messages:
@@ -77,8 +76,20 @@ commands:
       failed: 加入 {room.title} 失败
   tcbot.kick:
     description: 踢出机器人
-    usage: tcbot.kick <BOTID>
     messages:
       not-found: 未找到准备的机器人
       success: 成功踢出机器人
       success-all: 成功踢出所有机器人
+  tcbot.reset:
+    description: 脱离卡死
+    messages:
+      success: 成功
+  tcbot.kill:
+    description: 重置连接
+    messages:
+      not-found: 未找到机器人
+      success: 成功
+  tcbot.flush:
+    description: 导出日志
+    messages:
+      success: 成功

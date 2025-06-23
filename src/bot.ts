@@ -14,12 +14,14 @@ export class TziakchaBot {
   room: TziakchaBot.Status = {}
   status: 'idle' | 'wait' | 'play' = 'idle'
 
-  #ws: WebSocket
   #wsBot: WebSocket
+  #connectBotRetries = 0
+  #logs: any[] = []
+
+  #ws: WebSocket
   #heartbeat: Disposable
   #connectRetries = 0
   #lastHeartbeat: number = 0
-  #logs: any[] = []
 
   constructor(private ctx: Context, globalConfig: TziakchaBotService.Config, botConfig: TziakchaBotService.BotConfig) {
     this.config = {
@@ -42,6 +44,14 @@ export class TziakchaBot {
     })
 
     ctx.on('dispose', () => this.flush())
+  }
+
+  getStatus(): 'idle' | 'wait' | 'play' | 'closed' | 'killed' | 'connecting' {
+    if (this.closed) return 'closed'
+    if (this.killed) return 'killed'
+    if (!this.#ws || this.#connectRetries) return 'connecting'
+    if (!this.#wsBot || this.#connectBotRetries) return 'connecting'
+    return this.status
   }
 
   connect() {
@@ -95,9 +105,6 @@ export class TziakchaBot {
   async #connectBot() {
     this.killed = false
     this.#wsBot = this.ctx.http.ws(this.config.botEndpoint)
-    this.#wsBot.addEventListener('open', () => {
-      this.logger.info('Connected to agent')
-    })
     this.#wsBot.addEventListener('message', async (e: MessageEvent) => {
       const packet = JSON.parse(e.data)
       this.logger.debug('Receive from agent: ', packet)
@@ -118,13 +125,17 @@ export class TziakchaBot {
     })
     this.#wsBot.addEventListener('close', () => {
       this.logger.info('Disconnect')
-      try { this.#wsBot?.close() } finally { this.#ws = null }
+      try { this.#wsBot?.close() } finally { this.#wsBot = null }
       if (!this.closed) {
-        const interval = this.config.reconnectIntervals[this.#connectRetries] ?? this.config.reconnectIntervals.at(-1)
-        this.logger.info(`Connection closed. will reconnect after ${interval}ms ... (${this.#connectRetries})`)
+        const interval = this.config.reconnectIntervals[this.#connectBotRetries] ?? this.config.reconnectIntervals.at(-1)
+        this.logger.info(`Connection closed. will reconnect after ${interval}ms ... (${this.#connectBotRetries})`)
         this.ctx.setTimeout(this.#connectBot.bind(this), interval)
       }
-      this.#connectRetries += 1
+      this.#connectBotRetries += 1
+    })
+    this.#wsBot.addEventListener('open', () => {
+      this.logger.info('Connected to agent')
+      this.#connectBotRetries = 0
     })
   }
 
@@ -254,20 +265,24 @@ export class TziakchaBotService {
   constructor(private ctx: Context, private config: TziakchaBotService.Config) {
     ctx.on('ready', () => { mkdir(resolve(this.ctx.baseDir, 'data', 'tcbot', 'traces'), { recursive: true }) })
 
-    this.bots = this.config.bots.map(botConfig => new TziakchaBot(ctx, this.config, botConfig))
+    this.bots = this.config.bots.filter(botConfig => botConfig.enabled).map(botConfig => new TziakchaBot(ctx, this.config, botConfig))
 
     ctx.command('tcbot')
 
     const fmtBotStatus = (bot: TziakchaBot) => {
-      if (bot.killed) return `已出错❌`
-      else if (bot.status === 'idle') return `空闲中✅`
-      else if (bot.status === 'wait') return `准备中⏳`
-      else if (bot.status === 'play') return `对局中❌`
-      else return `未知❓`
+      const status = bot.getStatus()
+      switch (status) {
+        case 'idle': return `空闲中✅`
+        case 'wait': return `准备中⏳`
+        case 'play': return `对局中❌`
+        case 'closed': return `已断开❌`
+        case 'killed': return `已出错❌`
+        case 'connecting': return `连接中⏳`
+      }
     }
 
     ctx.command('tcbot.status').action(() => {
-      return this.bots.map(bot => `${bot.config.name} ${fmtBotStatus(bot)}`).join('\n')
+      return `- Bots(${this.bots.length})\n` + this.bots.map(bot => `${bot.config.name} ${fmtBotStatus(bot)}`).join('\n')
     })
 
     ctx.command('tcbot.join <roomPattern:string>')
@@ -309,20 +324,21 @@ export class TziakchaBotService {
         for (const bot of this.bots) {
           bot.status = 'idle'
         }
-        return 'Success'
+        return session.text('.success')
       })
 
     ctx.command('tcbot.kill', { authority: 3 })
       .action(async ({ session }, name) => {
         const bot = this.bots.find(bot => bot.config.name === name)
+        if (!bot) return session.text('.not-found')
         await bot.kill()
-        return 'Success'
+        return session.text('.success')
       })
 
     ctx.command('tcbot.flush', { authority: 3 })
       .action(async ({ session }, name) => {
         await Promise.all(this.bots.map(bot => bot.flush()))
-        return 'Success'
+        return session.text('.success')
       })
   }
 }
@@ -331,12 +347,14 @@ export namespace TziakchaBotService {
   export const inject = ['tclobby']
 
   export interface BotConfig {
+    enabled: boolean
     name: string
     username: string
     password: string
   }
 
   export const BotConfig: Schema<BotConfig> = Schema.object({
+    enabled: Schema.boolean().default(true),
     name: Schema.string(),
     username: Schema.string(),
     password: Schema.string().role('secret'),
