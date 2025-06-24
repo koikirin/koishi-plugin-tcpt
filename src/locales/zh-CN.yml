@@ -79,6 +79,11 @@ commands:
     messages:
       not-found: 未找到准备的机器人
       success: 成功踢出机器人 {context.join(', ')}
+  tcbot.delay:
+    description: 设置延迟
+    messages:
+      not-found: 未找到机器人
+      success: 成功
   tcbot.reset:
     description: 脱离卡死
     messages:

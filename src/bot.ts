@@ -1,6 +1,6 @@
 import { } from '@cordisjs/timer'
 import { mkdir, writeFile } from 'fs/promises'
-import { Context, Disposable, Logger, Schema, sleep, Time } from 'koishi'
+import { Context, Disposable, isNullable, Logger, Schema, sleep, Time } from 'koishi'
 import { solveWaitingTiles } from './utils'
 import { inflate } from 'pako'
 import { resolve } from 'path'
@@ -57,7 +57,7 @@ export class TziakchaBot {
 
   connect() {
     try { this.#ws?.close() } catch {}
-    this.#ws = this.ctx.http.ws(this.config.endpoint)
+    this.#ws = this.ctx.http.ws(this.config.serverEndpoint)
     this.#ws.addEventListener('message', this.#receive.bind(this))
     this.#ws.addEventListener('error', (e: ErrorEvent) => {
       if (!e.message.includes('invalid status code')) this.logger.warn(e)
@@ -106,7 +106,7 @@ export class TziakchaBot {
 
   async #connectBot() {
     this.killed = false
-    this.#wsBot = this.ctx.http.ws(this.config.botEndpoint)
+    this.#wsBot = this.ctx.http.ws(this.config.endpoint ?? this.config.botEndpoint)
     this.#wsBot.addEventListener('message', async (e: MessageEvent) => {
       const packet = JSON.parse(e.data)
       this.logger.debug('Receive from agent: ', packet)
@@ -322,6 +322,21 @@ export class TziakchaBotService {
         else return session.text('.not-found')
       })
 
+    ctx.command('tcbot.delay <delay:number>')
+      .option('bot', '-b <name:string>')
+      .action(async ({ session, options }, delay) => {
+        if (isNullable(delay)) return
+        if (options.bot) {
+          const bot = this.bots.find(bot => bot.config.name === options.bot)
+          if (!bot) return session.text('.not-found')
+          bot.delay = delay
+          return session.text('.success')
+        } else {
+          this.bots.forEach(bot => bot.delay = delay)
+          return session.text('.success')
+        }
+      })
+
     ctx.command('tcbot.reset')
       .action(async ({ session }) => {
         for (const bot of this.bots) {
@@ -362,6 +377,7 @@ export namespace TziakchaBotService {
     name: string
     username: string
     password: string
+    endpoint?: string
   }
 
   export const BotConfig: Schema<BotConfig> = Schema.object({
@@ -369,11 +385,12 @@ export namespace TziakchaBotService {
     name: Schema.string(),
     username: Schema.string(),
     password: Schema.string().role('secret'),
+    endpoint: Schema.string().required(false),
   })
 
   export interface Config {
     enabled: boolean
-    endpoint: string
+    serverEndpoint: string
     botEndpoint: string
     bots: BotConfig[]
     reconnectIntervals: number[]
@@ -384,7 +401,7 @@ export namespace TziakchaBotService {
 
   export const Config: Schema<Config> = Schema.object({
     enabled: Schema.boolean().default(true),
-    endpoint: Schema.string().default('wss://tziakcha.net:5334/ws'),
+    serverEndpoint: Schema.string().default('wss://tziakcha.net:5334/ws'),
     botEndpoint: Schema.string().default('ws://127.0.0.1:8089/'),
     bots: Schema.array(BotConfig).default([]),
     reconnectIntervals: Schema.array(Schema.number().role('ms')).default([
