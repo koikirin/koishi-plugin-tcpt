@@ -1,7 +1,7 @@
 {
   "name": "@hieuzest/koishi-plugin-tcpt",
   "description": "Query Tziakcha PT",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [

@@ -21,7 +21,7 @@ export class Tcpt {
 
     // ctx.plugin(TziakchaLobby, config.lobby)
     ctx.plugin(TziakchaLobby2, config.lobby2)
-    ctx.plugin(TziakchaBotService, config.bot)
+    if (config.bot.enabled) ctx.plugin(TziakchaBotService, config.bot)
 
     ctx.model.extend('user', {
       'tcpt/bind': 'string',

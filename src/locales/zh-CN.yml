@@ -78,8 +78,7 @@ commands:
     description: 踢出机器人
     messages:
       not-found: 未找到准备的机器人
-      success: 成功踢出机器人
-      success-all: 成功踢出所有机器人
+      success: 成功踢出机器人 {context.join(', ')}
   tcbot.reset:
     description: 脱离卡死
     messages:

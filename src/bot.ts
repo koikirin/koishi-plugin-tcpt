@@ -1,6 +1,6 @@
 import { } from '@cordisjs/timer'
 import { mkdir, writeFile } from 'fs/promises'
-import { Context, Disposable, isNullable, Logger, Schema, sleep, Time } from 'koishi'
+import { Context, Disposable, Logger, Schema, sleep, Time } from 'koishi'
 import { solveWaitingTiles } from './utils'
 import { inflate } from 'pako'
 import { resolve } from 'path'
@@ -9,6 +9,7 @@ export class TziakchaBot {
   config: TziakchaBotService.BotConfig & TziakchaBotService.Config
   logger: Logger
 
+  delay: number
   closed = false
   killed = false
   room: TziakchaBot.Status = {}
@@ -64,6 +65,7 @@ export class TziakchaBot {
     })
     this.#ws.addEventListener('close', () => {
       this.logger.info('Disconnect')
+      this.status = 'idle'
       try { this.#ws?.close() } finally { this.#ws = null }
       if (!this.closed) {
         const interval = this.config.reconnectIntervals[this.#connectRetries] ?? this.config.reconnectIntervals.at(-1)
@@ -108,23 +110,24 @@ export class TziakchaBot {
     this.#wsBot.addEventListener('message', async (e: MessageEvent) => {
       const packet = JSON.parse(e.data)
       this.logger.debug('Receive from agent: ', packet)
-      this.#log({
-        ...packet,
-        type: 'send',
-      })
       if (packet.type === 'error') {
         this.killed = true
         this.logger.warn('Agent error:', packet)
         return
       }
-      await sleep(this.config.delay)
+      this.killed = false
+      this.#log({
+        ...packet,
+        type: 'send',
+      })
+      await sleep(this.delay ?? this.config.delay)
       this.#ws.send(e.data)
     })
     this.#wsBot.addEventListener('error', (e: ErrorEvent) => {
       this.logger.warn('Agent error:', e.message)
     })
     this.#wsBot.addEventListener('close', () => {
-      this.logger.info('Disconnect')
+      this.logger.info('Agent disconnect')
       try { this.#wsBot?.close() } finally { this.#wsBot = null }
       if (!this.closed) {
         const interval = this.config.reconnectIntervals[this.#connectBotRetries] ?? this.config.reconnectIntervals.at(-1)
@@ -183,6 +186,7 @@ export class TziakchaBot {
   }
 
   async join(roomId: number, seat: number, password?: string) {
+    if (this.getStatus() !== 'idle') return false
     this.status = 'wait'
     this.logger.info(`Joining room ${roomId} at seat ${seat + 1}... with password ${password}`)
 
@@ -260,6 +264,8 @@ export namespace TziakchaBot {
 }
 
 export class TziakchaBotService {
+  static name = 'tcbot'
+
   bots: TziakchaBot[]
 
   constructor(private ctx: Context, private config: TziakchaBotService.Config) {
@@ -287,6 +293,7 @@ export class TziakchaBotService {
 
     ctx.command('tcbot.join <roomPattern:string>')
       .option('password', '-p <password:string>')
+      .option('delay', '-d <delay:number>')
       .action(async ({ session, options }, roomPattern) => {
         if (!roomPattern) return session.execute('help tcbot.join')
         const bot = this.bots.find(bot => bot.status === 'idle')
@@ -296,27 +303,23 @@ export class TziakchaBotService {
         if (candidates.length > 1) return session.text('.multiple-found')
         const room = candidates[0], seat = room.players.findIndex(x => !x)
         if (await bot.join(room.id, seat, options.password)) {
+          bot.delay = options.delay ?? this.config.delay
           return session.text('.success', { room, bot, seat })
         } else {
           return session.text('.failed', { room, bot })
         }
       })
 
-    ctx.command('tcbot.kick <name:string>')
-      .action(async ({ session }, name) => {
-        if (isNullable(name)) {
-          for (const bot of this.bots) {
-            if (bot.status === 'wait') {
-              await bot.exit()
-            }
+    ctx.command('tcbot.kick <...names:string>')
+      .action(async ({ session }, ...names) => {
+        const success = []
+        await Promise.all(this.bots.map(async bot => {
+          if (!names?.length || names.includes(bot.config.name)) {
+            return bot.exit().then(() => success.push(bot.config.name))
           }
-          return session.text('.success-all')
-        } else {
-          const bot = this.bots.find(bot => bot.config.name === name)
-          if (!bot || bot.status !== 'wait') return session.text('.not-found')
-          await bot.exit()
-          return session.text('.success')
-        }
+        }))
+        if (success.length) return session.text('.success', success)
+        else return session.text('.not-found')
       })
 
     ctx.command('tcbot.reset')
@@ -327,12 +330,20 @@ export class TziakchaBotService {
         return session.text('.success')
       })
 
-    ctx.command('tcbot.kill', { authority: 3 })
-      .action(async ({ session }, name) => {
-        const bot = this.bots.find(bot => bot.config.name === name)
-        if (!bot) return session.text('.not-found')
-        await bot.kill()
-        return session.text('.success')
+    ctx.command('tcbot.kill <...names: string>', { authority: 3 })
+      .option('all', '-a', { fallback: false })
+      .action(async ({ session, options }, ...names) => {
+        if (options.all) {
+          for (const bot of this.bots) {
+            await bot.kill()
+          }
+          return session.text('.success')
+        } else if (names?.length) {
+          const bots = this.bots.filter(bot => names.includes(bot.config.name))
+          if (!bots.length) return session.text('.not-found')
+          await Promise.all(bots.map(bot => bot.kill()))
+          return session.text('.success')
+        }
       })
 
     ctx.command('tcbot.flush', { authority: 3 })
@@ -361,6 +372,7 @@ export namespace TziakchaBotService {
   })
 
   export interface Config {
+    enabled: boolean
     endpoint: string
     botEndpoint: string
     bots: BotConfig[]
@@ -371,6 +383,7 @@ export namespace TziakchaBotService {
   }
 
   export const Config: Schema<Config> = Schema.object({
+    enabled: Schema.boolean().default(true),
     endpoint: Schema.string().default('wss://tziakcha.net:5334/ws'),
     botEndpoint: Schema.string().default('ws://127.0.0.1:8089/'),
     bots: Schema.array(BotConfig).default([]),
@@ -380,7 +393,7 @@ export namespace TziakchaBotService {
     ]),
     heartbeatInterval: Schema.number().role('ms').default(30000),
     responseInterval: Schema.number().role('ms').default(300),
-    delay: Schema.number().role('ms').default(1000),
+    delay: Schema.number().role('ms').default(1500),
   })
 }
 
