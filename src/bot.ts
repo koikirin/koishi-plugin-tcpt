@@ -1,6 +1,6 @@
 import { } from '@cordisjs/timer'
 import { mkdir, writeFile } from 'fs/promises'
-import { Context, Disposable, isNullable, Logger, Schema, sleep, Time } from 'koishi'
+import { Context, Disposable, isNullable, Logger, Random, Schema, sleep, Time } from 'koishi'
 import { solveWaitingTiles } from './utils'
 import { inflate } from 'pako'
 import { resolve } from 'path'
@@ -12,6 +12,7 @@ export class TziakchaBot {
   delay: number
   closed = false
   killed = false
+  ready = false // killed-restarted bot should wait for next round
   room: TziakchaBot.Status = {}
   status: 'idle' | 'wait' | 'play' = 'idle'
 
@@ -50,6 +51,7 @@ export class TziakchaBot {
   getStatus(): 'idle' | 'wait' | 'play' | 'closed' | 'killed' | 'connecting' {
     if (this.closed) return 'closed'
     if (this.killed) return 'killed'
+    if (this.status === 'play' && !this.ready) return 'killed'
     if (!this.#ws || this.#connectRetries) return 'connecting'
     if (!this.#wsBot || this.#connectBotRetries) return 'connecting'
     return this.status
@@ -114,6 +116,11 @@ export class TziakchaBot {
         this.killed = true
         this.logger.warn('Agent error:', packet)
         return
+      } else if (packet.type === 'fatal') {
+        this.killed = true
+        this.logger.error('Agent fatal error:', packet)
+        this.kill()
+        return
       }
       this.killed = false
       this.#log({
@@ -138,6 +145,7 @@ export class TziakchaBot {
     })
     this.#wsBot.addEventListener('open', () => {
       this.logger.info('Connected to agent')
+      this.ready = false
       this.#connectBotRetries = 0
     })
   }
@@ -199,7 +207,7 @@ export class TziakchaBot {
     }))
     await this.#wait()
 
-    if (!(this.room.i === roomId && this.room.s === seat)) {
+    if (!(this.room.i === roomId)) {
       this.status = 'idle'
       return false
     }
@@ -229,12 +237,17 @@ export class TziakchaBot {
     const op = packet.m
     if (op === 5) {
       if (packet.t === this.#lastHeartbeat) this.#lastHeartbeat = 0
+    } else if (op === 1 && packet.r === 1) {
+      if (packet.e) this.kill()
     } else if (op === 1 && packet.r === 8) {
       if (packet.t) this.room = packet.t
     } else if (op === 1 && packet.r === 10) {
       this.#login(packet.z)
     } else if (op === 2) {
       // game packets
+      if (packet.r === 14) {
+        this.ready = true
+      }
       await this.#process(packet)
       if (packet.r === 17) {
         this.status = 'idle'
@@ -245,6 +258,7 @@ export class TziakchaBot {
 
   async #process(packet) {
     this.status = 'play'
+    if (!this.ready) return
     this.logger.debug('Send to agent:', packet)
     this.#log({
       ...packet,
@@ -292,22 +306,37 @@ export class TziakchaBotService {
     })
 
     ctx.command('tcbot.join <roomPattern:string>')
+      .option('bot', '-b <name:string>')
       .option('password', '-p <password:string>')
+      .option('num', '-n <num:number>', { fallback: 1 })
       .option('delay', '-d <delay:number>')
       .action(async ({ session, options }, roomPattern) => {
         if (!roomPattern) return session.execute('help tcbot.join')
-        const bot = this.bots.find(bot => bot.status === 'idle')
-        if (!bot) return session.text('.no-available')
+        let bots: TziakchaBot[]
+        if (options.bot) {
+          bots = [this.bots.find(bot => bot.config.name === options.bot)]
+        } else if (this.config.randomPick) {
+          bots = Random.pick(this.bots.filter(bot => bot.getStatus() === 'idle'), options.num)
+        } else {
+          bots = this.bots.filter(bot => bot.getStatus() === 'idle').slice(0, options.num)
+        }
+        if (bots.length < options.num) return session.text('.no-available')
         const candidates = Object.values(ctx.tclobby.rooms).filter((room) => !room.start_time && room.title.match(roomPattern))
         if (candidates.length === 0) return session.text('.not-found')
         if (candidates.length > 1) return session.text('.multiple-found')
         const room = candidates[0], seat = room.players.findIndex(x => !x)
-        if (await bot.join(room.id, seat, options.password)) {
-          bot.delay = options.delay ?? this.config.delay
-          return session.text('.success', { room, bot, seat })
-        } else {
-          return session.text('.failed', { room, bot })
+
+        const result = []
+        for (const bot of bots) {
+          if (await bot.join(room.id, seat, options.password)) {
+            bot.delay = options.delay ?? this.config.delay
+            result.push(session.text('.success', { room, bot, seat }))
+          } else {
+            result.push(session.text('.failed', { room, bot }))
+            return result.join('\n')
+          }
         }
+        return result.join('\n')
       })
 
     ctx.command('tcbot.kick <...names:string>')
@@ -393,6 +422,7 @@ export namespace TziakchaBotService {
     serverEndpoint: string
     botEndpoint: string
     bots: BotConfig[]
+    randomPick: boolean
     reconnectIntervals: number[]
     heartbeatInterval: number
     responseInterval: number
@@ -404,6 +434,7 @@ export namespace TziakchaBotService {
     serverEndpoint: Schema.string().default('wss://tziakcha.net:5334/ws'),
     botEndpoint: Schema.string().default('ws://127.0.0.1:8089/'),
     bots: Schema.array(BotConfig).default([]),
+    randomPick: Schema.boolean().default(true),
     reconnectIntervals: Schema.array(Schema.number().role('ms')).default([
       Time.second * 5, Time.second * 10, Time.second * 30,
       Time.minute, Time.minute * 3, Time.minute * 5, Time.minute * 10,
