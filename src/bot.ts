@@ -112,11 +112,12 @@ export class TziakchaBot {
     this.#wsBot.addEventListener('message', async (e: MessageEvent) => {
       const packet = JSON.parse(e.data)
       this.logger.debug('Receive from agent: ', packet)
-      if (packet.type === 'error') {
+      const meta: TziakchaBot.ResponseMeta = packet._meta ?? {}
+      if (meta.t === 'error') {
         this.killed = true
         this.logger.warn('Agent error:', packet)
         return
-      } else if (packet.type === 'fatal') {
+      } else if (meta.t === 'fatal') {
         this.killed = true
         this.logger.error('Agent fatal error:', packet)
         this.kill()
@@ -127,8 +128,10 @@ export class TziakchaBot {
         ...packet,
         type: 'send',
       })
-      await sleep(this.delay ?? this.config.delay)
-      this.#ws.send(e.data)
+      if (meta.d !== false) await sleep(this.delay ?? this.config.delay)
+      delete packet._meta
+      if (this.#ws) this.#ws.send(JSON.stringify(packet))
+      else this.killed = true
     })
     this.#wsBot.addEventListener('error', (e: ErrorEvent) => {
       this.logger.warn('Agent error:', e.message)
@@ -247,6 +250,7 @@ export class TziakchaBot {
       // game packets
       if (packet.r === 14) {
         this.ready = true
+        ;(this.room ??= {}).p = packet.v
       }
       await this.#process(packet)
       if (packet.r === 17) {
@@ -258,7 +262,23 @@ export class TziakchaBot {
 
   async #process(packet) {
     this.status = 'play'
-    if (!this.ready) return
+    if (!this.ready) {
+      // bot not ready, we discard everything drawn ?
+      if (packet.r === 6 && packet.v === this.room.p) {
+        this.#ws.send(JSON.stringify({
+          m: 2,
+          r: 2,
+          v: packet.t & 0xff,
+        }))
+      } else if (packet.tt) {
+        this.#ws.send(JSON.stringify({
+          m: 2,
+          r: 9,
+          v: 0,
+        }))
+      }
+      return
+    }
     this.logger.debug('Send to agent:', packet)
     this.#log({
       ...packet,
@@ -274,6 +294,13 @@ export namespace TziakchaBot {
     s?: number // seat
     n?: string // name
     v?: number // vip 0/1
+    p?: number // seat in game
+  }
+
+  export interface ResponseMeta {
+    t?: string
+    m?: string
+    d?: false
   }
 }
 
@@ -340,9 +367,11 @@ export class TziakchaBotService {
       })
 
     ctx.command('tcbot.kick <...names:string>')
-      .action(async ({ session }, ...names) => {
+      .option('force', '-f', { fallback: false })
+      .action(async ({ session, options }, ...names) => {
         const success = []
         await Promise.all(this.bots.map(async bot => {
+          if (bot.getStatus() === 'play' && !options.force) return Promise.resolve()
           if (!names?.length || names.includes(bot.config.name)) {
             return bot.exit().then(() => success.push(bot.config.name))
           }
