@@ -167,7 +167,7 @@ export class TziakchaBot {
     try {
       const logs = this.#logs.slice()
       this.#logs = []
-      await writeFile(resolve(this.ctx.baseDir, 'data', 'tcbot', 'traces', `${this.config.name}-${Date.now()}.log`), JSON.stringify(logs, null, 2))
+      await writeFile(resolve(this.ctx.baseDir, 'data', 'tcbot', 'traces', `${this.config.name}-${Date.now()}.log`), JSON.stringify(logs))
       this.logger.info('Trace written successfully')
     } catch (e) {
       this.logger.warn('Failed to write trace:', e)
@@ -248,9 +248,15 @@ export class TziakchaBot {
       this.#login(packet.z)
     } else if (op === 2) {
       // game packets
+      if (packet.r === 1) {
+        packet._ts = performance.timeOrigin
+      }
       if (packet.r === 14) {
+        packet._ts = performance.now()
         this.ready = true
         ;(this.room ??= {}).p = packet.v
+      } else if (packet.r === 2) {
+        packet._ts = performance.now()
       }
       await this.#process(packet)
       if (packet.r === 17) {
