@@ -1,4 +1,3 @@
-import { } from '@cordisjs/timer'
 import { mkdir, writeFile } from 'fs/promises'
 import { Context, Disposable, isNullable, Logger, Random, Schema, sleep, Time } from 'koishi'
 import { solveWaitingTiles } from './utils'
@@ -41,7 +40,7 @@ export class TziakchaBot {
       return () => {
         this.closed = true
         try { this.#ws?.close() } finally { this.#ws = null }
-        try { this.#wsBot?.close() } finally { this.#ws = null }
+        try { this.#wsBot?.close() } finally { this.#wsBot = null }
       }
     })
 
@@ -313,6 +312,7 @@ export namespace TziakchaBot {
 export class TziakchaBotService {
   static name = 'tcbot'
 
+  enabled: boolean = true
   bots: TziakchaBot[]
 
   constructor(private ctx: Context, private config: TziakchaBotService.Config) {
@@ -338,12 +338,23 @@ export class TziakchaBotService {
       return `- Bots(${this.bots.length})\n` + this.bots.map(bot => `${bot.config.name} ${fmtBotStatus(bot)}`).join('\n')
     })
 
+    ctx.command('tcbot.disable', { authority: 3 }).action(() => {
+      this.enabled = false
+      return '- tcbot disabled'
+    })
+
+    ctx.command('tcbot.enable', { authority: 3 }).action(() => {
+      this.enabled = true
+      return '- tcbot enabled'
+    })
+
     ctx.command('tcbot.join <roomPattern:string>')
       .option('bot', '-b <name:string>')
       .option('password', '-p <password:string>')
       .option('num', '-n <num:number>', { fallback: 1 })
       .option('delay', '-d <delay:number>')
       .action(async ({ session, options }, roomPattern) => {
+        if (!this.enabled) return session.text('.disabled')
         if (!roomPattern) return session.execute('help tcbot.join')
         let bots: TziakchaBot[]
         if (options.bot) {

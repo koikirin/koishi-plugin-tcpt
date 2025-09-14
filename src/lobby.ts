@@ -1,5 +1,4 @@
 import { } from '@hieuzest/koishi-plugin-mahjong'
-import { } from '@cordisjs/timer'
 import { Context, Dict, Disposable, h, Logger, Schema } from 'koishi'
 import { fmtTl } from './utils'
 import { inflate } from 'pako'

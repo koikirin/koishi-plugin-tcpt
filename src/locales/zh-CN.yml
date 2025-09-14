@@ -66,6 +66,7 @@ commands:
     options:
       password: 房间密码
     messages:
+      disabled: 维护中
       no-room-pattern: 未指定房间名关键词
       no-available: 没有可用的机器人
       not-found: 未找到匹配的房间
