@@ -71,6 +71,7 @@ commands:
       no-available: 没有可用的机器人
       not-found: 未找到匹配的房间
       multiple-found: 找到多个匹配的房间
+      all-bots: 房间内已经全是机器人了
       success: |
         机器人 {bot.config.name} 成功加入 {room.title}
         使用 tcbot.kick {bot.config.name} 来踢出机器人

@@ -8,6 +8,8 @@ export class TziakchaBot {
   config: TziakchaBotService.BotConfig & TziakchaBotService.Config
   logger: Logger
 
+  name: string
+
   delay: number
   closed = false
   killed = false
@@ -243,6 +245,8 @@ export class TziakchaBot {
       if (packet.e) this.kill()
     } else if (op === 1 && packet.r === 8) {
       if (packet.t) this.room = packet.t
+    } else if (op === 1 && packet.r === 9) {
+      this.name = packet.u
     } else if (op === 1 && packet.r === 10) {
       this.#login(packet.z)
     } else if (op === 2) {
@@ -353,6 +357,7 @@ export class TziakchaBotService {
       .option('password', '-p <password:string>')
       .option('num', '-n <num:number>', { fallback: 1 })
       .option('delay', '-d <delay:number>')
+      .option('force', '-f', { fallback: false })
       .action(async ({ session, options }, roomPattern) => {
         if (!this.enabled) return session.text('.disabled')
         if (!roomPattern) return session.execute('help tcbot.join')
@@ -369,6 +374,8 @@ export class TziakchaBotService {
         if (candidates.length === 0) return session.text('.not-found')
         if (candidates.length > 1) return session.text('.multiple-found')
         const room = candidates[0], seat = room.players.findIndex(x => !x)
+
+        if (!options.force && room.players.every(x => this.botNames.includes(x.name))) return session.text('.all-bots')
 
         const result = []
         for (const bot of bots) {
@@ -441,6 +448,10 @@ export class TziakchaBotService {
         await Promise.all(this.bots.map(bot => bot.flush()))
         return session.text('.success')
       })
+  }
+
+  get botNames() {
+    return this.bots.map(bot => bot.name)
   }
 }
 
