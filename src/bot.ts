@@ -357,7 +357,7 @@ export class TziakchaBotService {
       .option('password', '-p <password:string>')
       .option('num', '-n <num:number>', { fallback: 1 })
       .option('delay', '-d <delay:number>')
-      .option('force', '-f', { fallback: false })
+      .option('force', '-f')
       .action(async ({ session, options }, roomPattern) => {
         if (!this.enabled) return session.text('.disabled')
         if (!roomPattern) return session.execute('help tcbot.join')
